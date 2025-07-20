@@ -70,6 +70,10 @@ venv.bak/
 # Streamlit
 .streamlit/secrets.toml
 
+# Local data files
+gco_data.csv
+data/
+
 # IDE
 .vscode/
 .idea/

@@ -20,6 +20,11 @@ This is a **Streamlit-based golf league statistics dashboard** for the GCO Golf 
 ## Essential Development Commands
 
 ```bash
+# Download fresh data from Google Sheets (recommended first step)
+./download_data.sh                    # Linux/Mac
+# OR
+./download_data.ps1                   # Windows PowerShell
+
 # Install dependencies
 pip install -r requirements.txt
 
@@ -42,6 +47,34 @@ flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statist
 # Test app syntax and imports
 python -m py_compile streamlit_app.py
 ```
+
+## Data Download Scripts
+
+Two scripts are provided to download fresh data from Google Sheets using browser credentials:
+
+### Linux/Mac (Bash)
+```bash
+./download_data.sh
+```
+
+### Windows (PowerShell)
+```powershell
+./download_data.ps1
+# For manual download only:
+./download_data.ps1 -Manual
+```
+
+**Features:**
+- **Automated download**: Tries multiple Google Sheets export URLs with browser-like headers
+- **Browser fallback**: Opens default browser for manual download if automated fails  
+- **Data validation**: Checks file format and shows preview
+- **Backup protection**: Backs up existing data before download
+- **Cross-platform**: Works on Linux, Mac, and Windows
+
+**Usage workflow:**
+1. Run download script to get fresh data → creates `gco_data.csv`
+2. Start Streamlit app → automatically uses local CSV file
+3. App shows "✅ Successfully loaded data from local file"
 
 ## Data Structure
 

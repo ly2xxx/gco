@@ -12,6 +12,7 @@ from plotly.subplots import make_subplots
 import requests
 from io import StringIO
 import re
+import os
 
 # Page configuration
 st.set_page_config(
@@ -46,25 +47,66 @@ st.markdown("""
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
 def load_gco_data():
-    """Load data from Google Sheets"""
+    """Load data from local file first, then Google Sheets, finally sample data"""
+    
+    # Try to load from local CSV file first
+    local_file = "gco_data.csv"
+    if os.path.exists(local_file):
+        try:
+            df = pd.read_csv(local_file)
+            # Validate that we have the expected columns
+            required_columns = ['Player', 'Tournament', 'Game', 'Net_Score']
+            if all(col in df.columns for col in required_columns) and not df.empty:
+                st.success("✅ Successfully loaded data from local file")
+                return df
+        except Exception as e:
+            st.warning(f"⚠️ Could not read local file: {str(e)}")
+    
+    # Try to load from Google Sheets as fallback
     try:
-        # Convert Google Sheets view URL to CSV export URL
         sheet_id = "1ZvtWd8zHMI0k2GQGMWhtFHl5xuDbciOW"
-        csv_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0"
         
-        # Read the CSV data
-        response = requests.get(csv_url)
-        response.raise_for_status()
+        # Try multiple URL formats for Google Sheets access
+        urls_to_try = [
+            f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid=0",
+            f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv",
+            f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&gid=0"
+        ]
         
-        # Parse CSV content
-        csv_content = StringIO(response.text)
-        df = pd.read_csv(csv_content)
+        for url in urls_to_try:
+            try:
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+                
+                response = requests.get(url, headers=headers, timeout=10)
+                response.raise_for_status()
+                
+                # Check if response contains valid CSV data (not HTML error page)
+                if response.text and not response.text.strip().startswith('<!DOCTYPE'):
+                    csv_content = StringIO(response.text)
+                    df = pd.read_csv(csv_content)
+                    
+                    # Validate columns
+                    required_columns = ['Player', 'Tournament', 'Game', 'Net_Score']
+                    if all(col in df.columns for col in required_columns) and not df.empty:
+                        # Save successful download for future use
+                        df.to_csv(local_file, index=False)
+                        st.success("✅ Successfully loaded and cached data from Google Sheets")
+                        return df
+                    
+            except Exception:
+                continue
         
-        return df
+        # If all URLs fail, show warning and use sample data
+        st.warning("⚠️ Could not access Google Sheets. Using sample data for demonstration.")
+        
     except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        # Return sample data for demonstration
-        return create_sample_data()
+        st.warning(f"⚠️ Google Sheets access failed: {str(e)}. Using sample data.")
+    
+    # Final fallback to sample data
+    st.info("📊 Using sample data for demonstration purposes")
+    return create_sample_data()
 
 def create_sample_data():
     """Create sample data structure based on the actual GCO league format"""
