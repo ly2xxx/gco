@@ -41,7 +41,7 @@ SEASON = "2026"
 
 PLAYERS: list[str] = [
     "刘北南", "Jacky", "赵鲲", "杨子初", "Neo", "徐峥",
-    "张纬", "曹振波", "李扬", "王文龙", "曾诚", "Justin",
+    "张纬", "曹振波", "李扬", "王文龙", "曾诚", "Justin", "杨明"
 ]
 
 # Red / Black team assignment (6 each)

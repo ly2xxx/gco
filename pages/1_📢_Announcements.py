@@ -16,6 +16,20 @@ anns = load_announcements()
 anns_sorted = sorted(anns, key=lambda a: (not a.get("pinned", False), a["date"]), reverse=False)
 anns_sorted = sorted(anns_sorted, key=lambda a: (not a.get("pinned", False), a["date"]))
 
+# ── Rulebook Download ─────────────────────────────────────────────────────────
+section(st, "📚", "赛季章程 Rulebook")
+st.info("了解 2026 赛季详细规则、积分系统及注意事项。")
+try:
+    with open("docs/gco-2026.pdf", "rb") as f:
+        st.download_button(
+            label="📄 下载 2026 赛季章程 (Download PDF)",
+            data=f,
+            file_name="GCO_2026_Rulebook.pdf",
+            mime="application/pdf"
+        )
+except FileNotFoundError:
+    st.error("Rulebook PDF not found.")
+
 # ── Display existing announcements ────────────────────────────────────────────
 section(st, "📌", "最新公告")
 
