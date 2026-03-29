@@ -75,13 +75,33 @@ html, body, [data-testid="stAppViewContainer"] {
     box-shadow: 0 6px 20px rgba(82,183,136,.35) !important;
 }
 
-/* ── Select boxes / inputs ────────────────────── */
+/* ── Select boxes / inputs & Labels ─────────────── */
+.stWidgetLabel p, label, [data-testid="stWidgetLabel"] p {
+    color: var(--text-primary) !important;
+    font-weight: 600 !important;
+    font-size: .95rem !important;
+    text-shadow: 0 1px 1px rgba(0,0,0,0.5); /* extra pop */
+}
+
 [data-testid="stSelectbox"] > div,
-[data-testid="stTextInput"] > div > div {
+[data-testid="stTextInput"] > div > div,
+[data-testid="stNumberInput"] > div > div,
+[data-testid="stDateInput"] > div > div {
     background: var(--surface2) !important;
     border-color: var(--surface3) !important;
-    color: var(--text-primary) !important;
     border-radius: 8px !important;
+}
+
+[data-testid="stNumberInput"] input,
+[data-testid="stDateInput"] input,
+[data-testid="stTextInput"] input,
+[data-testid="stSelectbox"] div {
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
+}
+[data-baseweb="input"] > div, [data-baseweb="select"] > div {
+    background-color: var(--surface2) !important;
+    border-color: var(--surface3) !important;
 }
 
 /* ── Expanders ────────────────────────────────── */
