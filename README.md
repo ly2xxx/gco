@@ -1,6 +1,6 @@
-# GCO Golf League 2025
+# GCO Golf Club 2026
 
-This repository tracks the scoring and statistics for the 2025 GCO Golf League with an interactive Streamlit dashboard.
+This repository tracks the scoring, announcements, and match management for the 2026 GCO Golf Season with a modern, multi-page Streamlit dashboard.
 
 ## 🎯 Live Dashboard
 
@@ -12,10 +12,10 @@ This repository tracks the scoring and statistics for the 2025 GCO Golf League w
 
 ### Prerequisites
 
-- Python 3.8 or higher
-- pip (Python package installer)
+- Python 3.10 or higher
+- [uv](https://github.com/astral-sh/uv) (Recommended package manager)
 
-### Installation & Setup
+### Installation & Setup (Recommended with uv)
 
 1. **Clone the repository:**
 
@@ -24,21 +24,17 @@ git clone https://github.com/ly2xxx/gco.git
 cd gco
 ```
 
-2. **Install dependencies:**
+2. **Run the application directly (uv handles everything):**
 
 ```bash
-pip install -r requirements.txt
+uv run streamlit run streamlit_app.py
 ```
 
-3. **Run the Streamlit application:**
-
-```bash
-streamlit run streamlit_app.py
-```
-
-4. **Access the dashboard:**
+3. **Access the dashboard:**
    - Open your browser and navigate to `http://localhost:8501`
-   - The application will automatically load the latest data from Google Sheets
+   - The dashboard provides links to 📢 Announcements, 📅 Events, 🏆 League, 🥊 Cup, and 🤝 Team Match.
+
+### Traditional Installation (pip)
 
 ### Alternative Installation (with virtual environment)
 
@@ -92,19 +88,14 @@ streamlit run streamlit_app.py
 - **Export Functionality**: Download filtered data as CSV
 - **Real-time Updates**: Automatic refresh from Google Sheets
 
-## 🧪 Testing
-
 Run the comprehensive test suite:
 
 ```bash
-# Run all tests
-pytest test_streamlit_app.py -v
+# Run all tests using uv
+uv run pytest test_streamlit_app.py -v
 
 # Run with coverage report
-pytest test_streamlit_app.py --cov=streamlit_app --cov-report=html
-
-# Run specific test categories
-pytest test_streamlit_app.py::TestPlayerStatistics -v
+uv run pytest test_streamlit_app.py --cov=streamlit_app --cov-report=html
 ```
 
 ### Test Coverage
@@ -144,12 +135,19 @@ pytest test_streamlit_app.py::TestPlayerStatistics -v
 
 ```
 gco/
-├── streamlit_app.py          # Main Streamlit application
-├── test_streamlit_app.py     # Comprehensive test suite
-├── requirements.txt          # Python dependencies
+├── streamlit_app.py          # Main Dashboard Directory / Entrypoint
+├── pages/                    # Multi-page dashboard modules
+│   ├── 1_📢_Announcements.py
+│   ├── 2_📅_Events.py
+│   ├── 3_🏆_League.py
+│   ├── 4_🥊_Cup.py
+│   └── 5_🤝_Team.py
+├── data/                     # Local JSON/CSV data storage
+├── pyproject.toml            # uv project configuration
+├── requirements.txt          # Shared dependencies
 ├── .streamlit/
-│   └── config.toml          # Streamlit configuration
-└── README.md                # This file
+│   └── config.toml           # Streamlit configuration
+└── README.md                 # This file
 ```
 
 ### Dependencies
@@ -246,4 +244,4 @@ Inspired by [Shaws Bar Golf Club Email](https://sh1.sendinblue.com/an3yjhki9xpfe
 
 ---
 
-**GCO Golf League 2025** | Made with ❤️ using Streamlit | Last updated: July 2025
+**GCO Golf Club 2026** | Made with ❤️ using Streamlit & uv | Last updated: March 2026
