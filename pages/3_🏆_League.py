@@ -54,7 +54,7 @@ st.dataframe(
         "Eagles": "老鹰", "Birdies": "小鸟", "Pars": "标准",
         "Bogeys": "柏忌", "DBogeys": "双柏忌", "Games": "轮次",
     }),
-    use_container_width=True,
+    width='stretch',
     hide_index=True,
 )
 
@@ -75,7 +75,7 @@ fig_oom.update_layout(
     coloraxis_showscale=False,
     xaxis=dict(tickfont=dict(size=11)),
 )
-st.plotly_chart(fig_oom, use_container_width=True)
+st.plotly_chart(fig_oom, width='stretch')
 
 # ── Per-tournament tabs ───────────────────────────────────────────────────────
 section(st, "🏌️", "轮次成绩单 Round-by-Round Breakdown")
@@ -107,7 +107,7 @@ for tab, (t_name, t_info) in zip(tabs, LEAGUE_TOURNAMENTS.items()):
         st.dataframe(
             lb.rename(columns={"Games": "轮次", "Total_Net": "净杆合计",
                                 "Birdies": "小鸟", "Eagles": "老鹰"}),
-            use_container_width=True,
+            width='stretch',
             hide_index=True,
         )
 
@@ -118,7 +118,7 @@ for tab, (t_name, t_info) in zip(tabs, LEAGUE_TOURNAMENTS.items()):
             pivot = pivot.reindex(columns=games)
             pivot["合计"] = pivot.sum(axis=1)
             pivot = pivot.sort_values("合计")
-            st.dataframe(pivot, use_container_width=True)
+            st.dataframe(pivot, width='stretch')
 
 # ── Player deep-dive ──────────────────────────────────────────────────────────
 section(st, "👤", "球员详情 Player Deep-Dive")
@@ -151,7 +151,7 @@ if not p_df.empty:
         plot_bgcolor="rgba(30,61,44,.4)",
         xaxis_title="轮次", yaxis_title="净杆数",
     )
-    st.plotly_chart(fig_trend, use_container_width=True)
+    st.plotly_chart(fig_trend, width='stretch')
 
     # Scoring profile donut
     totals = {
@@ -173,7 +173,7 @@ if not p_df.empty:
         paper_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", yanchor="bottom", y=-0.2),
     )
-    st.plotly_chart(fig_donut, use_container_width=True)
+    st.plotly_chart(fig_donut, width='stretch')
 
 # ── Admin: Record Results ─────────────────────────────────────────────────────
 section(st, "⚙️", "管理 Admin: Record Results")
@@ -228,7 +228,7 @@ with st.expander("📝 录入或修改成绩 Record / Edit Scores", expanded=Fal
         in_bg = bc4.number_input("柏忌 Bogey", min_value=0, value=int(rec.get("Bogeys", 0)))
         in_dbg = bc5.number_input("双柏忌+ D.Bogey+", min_value=0, value=int(rec.get("Double_Bogeys", 0)))
 
-        if st.form_submit_button("✅ 保存成绩 Save", use_container_width=True):
+        if st.form_submit_button("✅ 保存成绩 Save", width='stretch'):
             if not existing_row.empty:
                 df = df[~mask]
 

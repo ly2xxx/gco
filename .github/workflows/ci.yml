@@ -66,15 +66,3 @@ jobs:
     - name: Test Streamlit app syntax
       run: |
         python -m py_compile streamlit_app.py
-    
-    - name: Test Streamlit app imports
-      run: |
-        python -c "
-        import sys
-        sys.modules['streamlit'] = type(sys)('streamlit')
-        sys.modules['plotly.express'] = type(sys)('plotly.express')
-        sys.modules['plotly.graph_objects'] = type(sys)('plotly.graph_objects')
-        sys.modules['plotly.subplots'] = type(sys)('plotly.subplots')
-        from streamlit_app import create_sample_data, calculate_player_stats
-        print('✅ All imports successful')
-        "

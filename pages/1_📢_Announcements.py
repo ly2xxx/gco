@@ -60,7 +60,7 @@ with st.expander("➕ 发布新公告 / Post New Announcement", expanded=False):
         with col5:
             new_pinned = st.checkbox("📌 置顶 Pin", value=False)
 
-        submitted = st.form_submit_button("📢 发布 Publish", use_container_width=True)
+        submitted = st.form_submit_button("📢 发布 Publish", width='stretch')
         if submitted:
             if not new_title.strip() or not new_body.strip():
                 st.error("请填写标题和内容！")

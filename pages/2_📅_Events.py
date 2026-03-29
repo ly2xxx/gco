@@ -87,7 +87,7 @@ with st.expander("➕ 添加赛事 / Add Event", expanded=False):
         with c2:
             ev_type = st.selectbox("类型 Type", ["League", "Cup", "Outing", "Grand Final"])
             ev_details = st.text_input("详情 Details", placeholder="Format, venue, etc.")
-        submitted = st.form_submit_button("➕ 添加 Add", use_container_width=True)
+        submitted = st.form_submit_button("➕ 添加 Add", width='stretch')
         if submitted:
             if not ev_name.strip():
                 st.error("请填写赛事名称！")
