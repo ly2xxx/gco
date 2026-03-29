@@ -120,22 +120,20 @@ for col_idx, (rk, rl) in enumerate(ROUND_LABELS.items()):
                 score_html_1 = f"<div class='brkt-score'>{score} FINAL</div>" if p1_class and score else ""
                 score_html_2 = f"<div class='brkt-score'>{score} FINAL</div>" if p2_class and score else ""
 
-                m_html = f"""
-                <div class="brkt-col" style="margin-top:{idx * (col_idx * 30)}px">
-                    <div class="brkt-match">
-                        <div class="brkt-header">Match {idx+1}</div>
-                        <div class="brkt-player-row {p1_class}">
-                            <div>🏴󠁧󠁢󠁳󠁣󠁴󠁿 {p1_name} <span class="seed-txt">({p1_slot})</span></div>
-                            {score_html_1}
-                        </div>
-                        <div class="brkt-player-row {p2_class}">
-                            <div>🏴󠁧󠁢󠁳󠁣󠁴󠁿 {p2_name} <span class="seed-txt">({p2_slot if p2_slot else 'BYE'})</span></div>
-                            {score_html_2}
-                        </div>
-                    </div>
-                </div>
-                """
-                st.markdown(m_html, unsafe_allow_html=True)
+                m_html = f"""<div class="brkt-col" style="margin-top:{idx * (col_idx * 30)}px">
+  <div class="brkt-match">
+    <div class="brkt-header">Match {idx+1}</div>
+    <div class="brkt-player-row {p1_class}">
+      <div>🏴󠁧󠁢󠁳󠁣󠁴󠁿 {p1_name} <span class="seed-txt">({p1_slot})</span></div>
+      {score_html_1}
+    </div>
+    <div class="brkt-player-row {p2_class}">
+      <div>🏴󠁧󠁢󠁳󠁣󠁴󠁿 {p2_name} <span class="seed-txt">({p2_slot if p2_slot else 'BYE'})</span></div>
+      {score_html_2}
+    </div>
+  </div>
+</div>"""
+                st.html(m_html)
 
 # ── Record Match Result Forms ─────────────────────────────────────────────────
 section(st, "✏️", "录入赛果 Record Results")
