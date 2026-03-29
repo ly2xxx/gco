@@ -12,7 +12,8 @@ from pages.data import (
     load_events, save_events,
     load_announcements, save_announcements,
     load_cup, save_cup,
-    load_outing, save_outing
+    load_outing, save_outing,
+    save_to_backup
 )
 
 st.set_page_config(page_title="GCO | Data API", page_icon="💾", layout="wide")
@@ -49,12 +50,13 @@ c1, c2 = st.columns(2)
 
 with c1:
     section(st, "📥", "Export Data (Download JSON)")
-    st.info("Download the entire application state including all scores, events, announcements, outings, and cup data into a portable JSON file.")
+    st.info("Download the entire application state into a portable JSON file. **A local copy will also be saved to the `backup/` folder automatically when you download.**")
     st.download_button(
         label="Download GCO Data Backup (.json)",
         data=json_string,
         file_name=f"gco_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
-        mime="application/json"
+        mime="application/json",
+        on_click=lambda: save_to_backup(state_data)
     )
 
 with c2:
