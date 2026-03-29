@@ -31,12 +31,12 @@ LEAGUE_TOURNAMENTS: dict[str, dict] = {
     "2026个人联赛": {"period": "2026-04-01 ~ 2026-09-30", "games": 6},
 }
 
-# Team match types
-TEAM_MATCHES: list[dict] = [
-    {"id": "tm1", "name": "Fourball Betterball Match Play",  "format": "doubles", "hcp_allowance": "90%"},
-    {"id": "tm2", "name": "Fourball Betterball Stableford",  "format": "doubles", "hcp_allowance": "85%"},
-    {"id": "tm3", "name": "2-Man Scramble",                  "format": "doubles", "hcp_allowance": "35%/15%"},
-    {"id": "tm4", "name": "4-Man Scramble",                  "format": "fours",   "hcp_allowance": "25%/20%/15%/10%"},
+# Team match types (now referred to as Outing Days)
+OUTING_MATCHES: list[dict] = [
+    {"id": "om1", "name": "Outing Day 1: Fourball Betterball Match Play",  "format": "doubles", "hcp_allowance": "90%"},
+    {"id": "om2", "name": "Outing Day 2: Fourball Betterball Stableford",  "format": "doubles", "hcp_allowance": "85%"},
+    {"id": "om3", "name": "Outing Day 3: 2-Man Scramble",                  "format": "doubles", "hcp_allowance": "35%/15%"},
+    {"id": "om4", "name": "Outing Day 4: 4-Man Scramble",                  "format": "fours",   "hcp_allowance": "25%/20%/15%/10%"},
 ]
 
 # ── Upcoming events (editable JSON) ──────────────────────────────────────────
@@ -45,15 +45,15 @@ EVENTS_FILE = DATA_DIR / "events.json"
 DEFAULT_EVENTS: list[dict] = [
     {"date": "2026-04-04", "name": "联赛第1轮 - Stroke Play", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
     {"date": "2026-04-12", "name": "个人杯赛第一轮开始",              "type": "Cup",          "details": "Knockout Match Play, R1 fixtures announced"},
-    {"date": "2026-05-03", "name": "Fourball Betterball MP",         "type": "Team",         "details": "Red vs Black – Team Match 1"},
+    {"date": "2026-04-26", "name": "Outing Day 1 (Team Match)",      "type": "Outing",      "details": "Format: Fourball Betterball Match Play"},
     {"date": "2026-05-17", "name": "联赛第2轮 - Stroke Play", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
+    {"date": "2026-05-31", "name": "Outing Day 2 (Team Match)",      "type": "Outing",      "details": "Format: Fourball Betterball Stableford"},
     {"date": "2026-06-07", "name": "联赛第3轮 - Stroke Play", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
     {"date": "2026-06-14", "name": "个人杯赛半决赛",                  "type": "Cup",          "details": "Knockout Match Play Semi-Finals"},
-    {"date": "2026-06-21", "name": "联赛第4轮 - Stroke Play",     "type": "League",       "details": "Stroke Play, OOM Qualifying"},
-    {"date": "2026-07-05", "name": "2-Man Scramble",                 "type": "Team",         "details": "Red vs Black – Team Match 3"},
+    {"date": "2026-06-21", "name": "Outing Day 3 (Team Match)",      "type": "Outing",      "details": "Format: 2-Man Scramble + League Game 4"},
     {"date": "2026-07-19", "name": "联赛第5轮 - Stroke Play",     "type": "League",       "details": "Stroke Play, OOM Qualifying"},
     {"date": "2026-08-09", "name": "联赛第6轮 - Stroke Play",     "type": "League",       "details": "Stroke Play, OOM Qualifying"},
-    {"date": "2026-08-23", "name": "个人杯赛决赛",                    "type": "Cup",          "details": "Knockout Match Play Final"},
+    {"date": "2026-08-23", "name": "Outing Day 4 (Team Match)",      "type": "Outing",      "details": "Format: 4-Man Scramble + Cup Final"},
     {"date": "2026-09-13", "name": "年终总决赛",                      "type": "Grand Final",  "details": "36-Hole Stroke Play + Beat the Champion"},
 ]
 
@@ -80,7 +80,7 @@ DEFAULT_ANNOUNCEMENTS: list[dict] = [
             "**赛历亮点：**\n"
             "- 个人联赛：6场 18-Hole Stroke Play，排名前三晋级总决赛\n"
             "- 个人杯赛：Knockout Match Play，12人单场淘汰赛决出冠军\n"
-            "- 团队赛：红队 vs 黑队，双人赛×3 + 四人赛×1\n"
+            "- 团队赛：红队 vs 黑队，4场 Outing Day 积分对抗赛\n"
             "- 年终总决赛：36洞Stroke Play，排名前三+杯赛冠军\n\n"
             "请所有成员确认Scottish Golf账户有效，并关注微信群通知。\n\n"
             "预祝大家2026赛季愉快！⛳"
@@ -179,31 +179,31 @@ def load_cup() -> dict:
 def save_cup(cup: dict) -> None:
     CUP_FILE.write_text(json.dumps(cup, ensure_ascii=False, indent=2), encoding="utf-8")
 
-# ── Team match data ───────────────────────────────────────────────────────────
-TEAM_FILE = DATA_DIR / "team.json"
+# ── Outing Match data (Red vs Black) ──────────────────────────────────────────
+OUTING_FILE = DATA_DIR / "outing.json"
 
-DEFAULT_TEAM: dict = {
+DEFAULT_OUTING: dict = {
     "red_team":  RED_TEAM,
     "black_team": BLACK_TEAM,
     "matches": [
         {
-            "id": "tm1", "name": "Fourball Betterball Match Play",
-            "date": "TBD", "venue": "TBD",
+            "id": "om1", "name": "Outing Day 1: Fourball Betterball Match Play",
+            "date": "2026-04-26", "venue": "TBD",
             "red_score": None, "black_score": None, "status": "upcoming"
         },
         {
-            "id": "tm2", "name": "Fourball Betterball Stableford",
-            "date": "TBD", "venue": "TBD",
+            "id": "om2", "name": "Outing Day 2: Fourball Betterball Stableford",
+            "date": "2026-05-31", "venue": "TBD",
             "red_score": None, "black_score": None, "status": "upcoming"
         },
         {
-            "id": "tm3", "name": "2-Man Scramble",
-            "date": "TBD", "venue": "TBD",
+            "id": "om3", "name": "Outing Day 3: 2-Man Scramble",
+            "date": "2026-06-21", "venue": "TBD",
             "red_score": None, "black_score": None, "status": "upcoming"
         },
         {
-            "id": "tm4", "name": "4-Man Scramble",
-            "date": "TBD", "venue": "TBD",
+            "id": "om4", "name": "Outing Day 4: 4-Man Scramble",
+            "date": "2026-08-23", "venue": "TBD",
             "red_score": None, "black_score": None, "status": "upcoming"
         },
     ],
@@ -211,10 +211,10 @@ DEFAULT_TEAM: dict = {
     "winning_threshold": 4.5,
 }
 
-def load_team() -> dict:
-    if TEAM_FILE.exists():
-        return json.loads(TEAM_FILE.read_text(encoding="utf-8"))
-    return DEFAULT_TEAM
+def load_outing() -> dict:
+    if OUTING_FILE.exists():
+        return json.loads(OUTING_FILE.read_text(encoding="utf-8"))
+    return DEFAULT_OUTING
 
-def save_team(team: dict) -> None:
-    TEAM_FILE.write_text(json.dumps(team, ensure_ascii=False, indent=2), encoding="utf-8")
+def save_outing(outing: dict) -> None:
+    OUTING_FILE.write_text(json.dumps(outing, ensure_ascii=False, indent=2), encoding="utf-8")

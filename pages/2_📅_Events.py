@@ -18,8 +18,8 @@ col_f1, col_f2 = st.columns([3, 1])
 with col_f1:
     type_filter = st.multiselect(
         "筛选类型 Filter by type",
-        ["League", "Cup", "Team", "Grand Final"],
-        default=["League", "Cup", "Team", "Grand Final"],
+        ["League", "Cup", "Outing", "Grand Final"],
+        default=["League", "Cup", "Outing", "Grand Final"],
     )
 with col_f2:
     show_past = st.checkbox("显示过去的赛事 Show past events", value=False)
@@ -37,40 +37,43 @@ section(st, "📆", "赛事日程")
 if not filtered_sorted:
     st.info("📭 没有符合条件的赛事。")
 else:
+    all_cards_html = ""
     for ev in filtered_sorted:
         ev_date = datetime.strptime(ev["date"], "%Y-%m-%d")
         is_upcoming = ev["date"] >= today_str
         pill_cls, pill_label = EVENT_COLORS.get(ev["type"], ("pill-league", ev["type"]))
         days_to = (ev_date.date() - date.today()).days
 
-        if is_upcoming and days_to <= 7:
-            countdown_html = f'<span style="color:#e74c3c;font-weight:700">  ⏰ {days_to}天后！</span>'
-        elif is_upcoming and days_to <= 30:
-            countdown_html = f'<span style="color:#d4af37;font-weight:600">  📌 {days_to}天后</span>'
-        else:
-            countdown_html = ""
+        countdown_html = ""
+        if is_upcoming:
+            if days_to <= 7:
+                countdown_html = f'<span style="color:#e74c3c;font-weight:700;margin-left:10px">⏰ {days_to}天后！</span>'
+            elif days_to <= 30:
+                countdown_html = f'<span style="color:#d4af37;font-weight:600;margin-left:10px">📌 {days_to}天后</span>'
 
-        card = f"""
-        <div class="gco-card" style="display:flex;gap:1.2rem;align-items:flex-start;">
-            <div style="min-width:70px;text-align:center;">
-                <div style="font-size:1.5rem;font-weight:800;color:var(--gold);">{ev_date.day:02d}</div>
-                <div style="font-size:.75rem;color:var(--text-muted);text-transform:uppercase;">
+        all_cards_html += f"""
+        <div class="gco-card" style="display:flex;gap:1.5rem;align-items:center;padding:1.4rem;">
+            <div style="min-width:80px;text-align:center;border-right:1px solid var(--surface3);padding-right:1rem;">
+                <div style="font-size:1.8rem;font-weight:800;color:var(--gold);line-height:1;">{ev_date.day:02d}</div>
+                <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;margin-top:4px;">
                     {ev_date.strftime('%b %Y')}
                 </div>
             </div>
             <div style="flex:1;">
-                <span class="gco-pill {pill_cls}">{pill_label}</span>
-                {countdown_html}
-                <div style="font-size:1rem;font-weight:600;color:var(--text-primary);margin-top:.3rem;">
+                <div style="display:flex;align-items:center;margin-bottom:6px;">
+                    <span class="gco-pill {pill_cls}">{pill_label}</span>
+                    {countdown_html}
+                </div>
+                <div style="font-size:1.1rem;font-weight:700;color:var(--text-primary);">
                     {ev['name']}
                 </div>
-                <div style="font-size:.82rem;color:var(--text-secondary);margin-top:.2rem;">
+                <div style="font-size:.85rem;color:var(--text-secondary);margin-top:4px;line-height:1.4">
                     {ev.get('details','')}
                 </div>
             </div>
         </div>
         """
-        st.markdown(card, unsafe_allow_html=True)
+    st.html(all_cards_html)
 
 # ── Admin: add / edit events ──────────────────────────────────────────────────
 section(st, "⚙️", "管理赛事")
@@ -82,7 +85,7 @@ with st.expander("➕ 添加赛事 / Add Event", expanded=False):
             ev_name = st.text_input("赛事名称 Name *")
             ev_date_input = st.date_input("日期 Date", value=date.today())
         with c2:
-            ev_type = st.selectbox("类型 Type", ["League", "Cup", "Team", "Grand Final"])
+            ev_type = st.selectbox("类型 Type", ["League", "Cup", "Outing", "Grand Final"])
             ev_details = st.text_input("详情 Details", placeholder="Format, venue, etc.")
         submitted = st.form_submit_button("➕ 添加 Add", use_container_width=True)
         if submitted:
@@ -97,3 +100,4 @@ with st.expander("➕ 添加赛事 / Add Event", expanded=False):
                 })
                 save_events(events)
                 st.success("✅ 赛事已添加！请刷新查看。")
+                st.rerun()

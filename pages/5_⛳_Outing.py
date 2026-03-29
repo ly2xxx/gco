@@ -1,22 +1,22 @@
 """
-GCO 2026 – Team Matches (红黑队赛)
+GCO 2026 – Outing Day (Red vs Black 对抗赛)
 """
 import streamlit as st
 import plotly.graph_objects as go
 from pages.theme import inject_theme, hero, section
-from pages.data import load_team, save_team
+from pages.data import load_outing, save_outing
 
-st.set_page_config(page_title="GCO | 团队赛", page_icon="🤝", layout="wide")
+st.set_page_config(page_title="GCO | Outing Day", page_icon="⛳", layout="wide")
 inject_theme(st)
 
-hero(st, "🤝 团队对抗赛", "Red vs Black Team Matches", "GCO 2026")
+hero(st, "⛳ Outing Day 对抗赛", "Red vs Black Team Outings", "GCO 2026")
 
-team_data = load_team()
-red_t = team_data["red_team"]
-black_t = team_data["black_team"]
-matches = team_data["matches"]
-tot_pts = team_data["total_points"]
-win_thresh = team_data["winning_threshold"]
+outing_data = load_outing()
+red_t = outing_data["red_team"]
+black_t = outing_data["black_team"]
+matches = outing_data["matches"]
+tot_pts = outing_data["total_points"]
+win_thresh = outing_data["winning_threshold"]
 
 # Calculate current score
 red_score = 0.0
@@ -72,10 +72,10 @@ html_score = f"""
 st.markdown(html_score, unsafe_allow_html=True)
 
 if red_score >= win_thresh:
-    st.success("🏆 恭喜红队获得 GCO 2026 团队赛最高荣誉！")
+    st.success("🏆 恭喜红队获得 GCO 2026 团队对抗赛最高荣誉！")
     st.balloons()
 elif black_score >= win_thresh:
-    st.info("🏆 恭喜黑队获得 GCO 2026 团队赛最高荣誉！")
+    st.info("🏆 恭喜黑队获得 GCO 2026 团队对抗赛最高荣誉！")
     st.balloons()
 
 # ── Match details ──────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ for m in matches:
             """, unsafe_allow_html=True)
             
     with st.expander(f"⚙️ 更新 {m['name']} 赛果"):
-        with st.form(f"team_form_{m['id']}"):
+        with st.form(f"outing_form_{m['id']}"):
             st.write(f"录入 **{m['name']}** 的得分")
             col_in1, col_in2, col_in3 = st.columns(3)
             with col_in1:
@@ -121,7 +121,7 @@ for m in matches:
                 m["red_score"] = new_red
                 m["black_score"] = new_black
                 m["status"] = new_status
-                save_team(team_data)
+                save_outing(outing_data)
                 st.success("比赛结果已更新！")
                 st.rerun()
     st.markdown("---")

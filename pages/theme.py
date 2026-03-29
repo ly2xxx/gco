@@ -115,6 +115,7 @@ html, body, [data-testid="stAppViewContainer"] {
 .pill-league    { background: #1a4731; color: #52b788; border: 1px solid #2d6a4f; }
 .pill-cup       { background: #3a2a10; color: #d4af37; border: 1px solid #8a6a1f; }
 .pill-team      { background: #2a1a3a; color: #9b59b6; border: 1px solid #5a2d8a; }
+.pill-outing    { background: #1a3a3a; color: #52b7b7; border: 1px solid #2d6a6a; }
 .pill-final     { background: #3a1a1a; color: #e74c3c; border: 1px solid #8a2d2d; }
 .pill-pinned    { background: var(--gold); color: #1a1a1a; }
 .pill-important { background: #e74c3c; color: #fff; }
@@ -218,5 +219,6 @@ EVENT_COLORS = {
     "League":      ("pill-league", "联赛"),
     "Cup":         ("pill-cup",    "杯赛"),
     "Team":        ("pill-team",   "团队"),
+    "Outing":      ("pill-outing", "对抗赛"),
     "Grand Final": ("pill-final",  "总决赛"),
 }
