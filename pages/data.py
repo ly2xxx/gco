@@ -28,9 +28,7 @@ BLACK_TEAM = PLAYERS[6:]
 
 # Individual league tournaments (联赛)
 LEAGUE_TOURNAMENTS: dict[str, dict] = {
-    "提提卡卡杯": {"period": "2026-04-01 ~ 2026-05-31", "games": 4},
-    "暖男杯":    {"period": "2026-06-01 ~ 2026-07-31", "games": 4},
-    "凯尔特人杯": {"period": "2026-08-01 ~ 2026-09-15", "games": 4},
+    "2026个人联赛": {"period": "2026-04-01 ~ 2026-09-30", "games": 6},
 }
 
 # Team match types
@@ -45,16 +43,17 @@ TEAM_MATCHES: list[dict] = [
 EVENTS_FILE = DATA_DIR / "events.json"
 
 DEFAULT_EVENTS: list[dict] = [
-    {"date": "2026-04-04", "name": "联赛第1轮 - 提提卡卡杯 Game 1", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
+    {"date": "2026-04-04", "name": "联赛第1轮 - Stroke Play", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
     {"date": "2026-04-12", "name": "个人杯赛第一轮开始",              "type": "Cup",          "details": "Knockout Match Play, R1 fixtures announced"},
-    {"date": "2026-04-20", "name": "联赛第2轮 - 提提卡卡杯 Game 2", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
     {"date": "2026-05-03", "name": "Fourball Betterball MP",         "type": "Team",         "details": "Red vs Black – Team Match 1"},
-    {"date": "2026-05-17", "name": "联赛第3轮 - 提提卡卡杯 Game 3", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
-    {"date": "2026-06-07", "name": "联赛第4轮 - 提提卡卡杯 Game 4", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
+    {"date": "2026-05-17", "name": "联赛第2轮 - Stroke Play", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
+    {"date": "2026-06-07", "name": "联赛第3轮 - Stroke Play", "type": "League",       "details": "Stroke Play, OOM Qualifying"},
     {"date": "2026-06-14", "name": "个人杯赛半决赛",                  "type": "Cup",          "details": "Knockout Match Play Semi-Finals"},
-    {"date": "2026-06-21", "name": "联赛第5轮 - 暖男杯 Game 5",     "type": "League",       "details": "Stroke Play, OOM Qualifying"},
+    {"date": "2026-06-21", "name": "联赛第4轮 - Stroke Play",     "type": "League",       "details": "Stroke Play, OOM Qualifying"},
     {"date": "2026-07-05", "name": "2-Man Scramble",                 "type": "Team",         "details": "Red vs Black – Team Match 3"},
-    {"date": "2026-08-09", "name": "个人杯赛决赛",                    "type": "Cup",          "details": "Knockout Match Play Final"},
+    {"date": "2026-07-19", "name": "联赛第5轮 - Stroke Play",     "type": "League",       "details": "Stroke Play, OOM Qualifying"},
+    {"date": "2026-08-09", "name": "联赛第6轮 - Stroke Play",     "type": "League",       "details": "Stroke Play, OOM Qualifying"},
+    {"date": "2026-08-23", "name": "个人杯赛决赛",                    "type": "Cup",          "details": "Knockout Match Play Final"},
     {"date": "2026-09-13", "name": "年终总决赛",                      "type": "Grand Final",  "details": "36-Hole Stroke Play + Beat the Champion"},
 ]
 
@@ -79,10 +78,10 @@ DEFAULT_ANNOUNCEMENTS: list[dict] = [
         "body": (
             "全体GCO成员，2026赛季即将拉开帷幕！\n\n"
             "**赛历亮点：**\n"
-            "- 个人联赛：提提卡卡杯、暖男杯、凯尔特人杯（各4轮，共12场）\n"
-            "- 个人杯赛：Knockout Match Play，12人单淘汰赛\n"
+            "- 个人联赛：6场 18-Hole Stroke Play，排名前三晋级总决赛\n"
+            "- 个人杯赛：Knockout Match Play，12人单场淘汰赛决出冠军\n"
             "- 团队赛：红队 vs 黑队，双人赛×3 + 四人赛×1\n"
-            "- 年终总决赛：36洞Stroke Play，9月中旬\n\n"
+            "- 年终总决赛：36洞Stroke Play，排名前三+杯赛冠军\n\n"
             "请所有成员确认Scottish Golf账户有效，并关注微信群通知。\n\n"
             "预祝大家2026赛季愉快！⛳"
         ),
@@ -119,7 +118,7 @@ SCORES_FILE = DATA_DIR / "scores.csv"
 def _sample_scores() -> pd.DataFrame:
     rng = np.random.default_rng(42)
     rows = []
-    game_id = 1
+    game_id: int = 1
     for t_name, t_info in LEAGUE_TOURNAMENTS.items():
         for g in range(1, t_info["games"] + 1):
             game_label = f"Game {game_id}"

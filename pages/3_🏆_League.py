@@ -76,7 +76,7 @@ fig_oom.update_layout(
 st.plotly_chart(fig_oom, use_container_width=True)
 
 # ── Per-tournament tabs ───────────────────────────────────────────────────────
-section(st, "🏌️", "分赛段排名 Per-Tournament Standings")
+section(st, "🏌️", "轮次成绩单 Round-by-Round Breakdown")
 
 tabs = st.tabs(list(LEAGUE_TOURNAMENTS.keys()))
 
