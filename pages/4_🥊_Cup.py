@@ -5,8 +5,8 @@ import streamlit as st
 import json
 
 import streamlit as st
-from pages.theme import inject_theme, hero, section
-from pages.data import load_cup, save_cup, PLAYERS
+from theme import inject_theme, hero, section
+from data import load_cup, save_cup, PLAYERS
 
 st.set_page_config(page_title="GCO | 个人杯赛", page_icon="🥊", layout="wide")
 inject_theme(st)

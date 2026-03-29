@@ -3,8 +3,8 @@ GCO 2026 – Events Calendar page
 """
 import streamlit as st
 from datetime import date, datetime
-from pages.theme import inject_theme, hero, section, EVENT_COLORS
-from pages.data import load_events, save_events
+from theme import inject_theme, hero, section, EVENT_COLORS
+from data import load_events, save_events
 
 st.set_page_config(page_title="GCO | 赛历", page_icon="📅", layout="wide")
 inject_theme(st)

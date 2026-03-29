@@ -9,7 +9,7 @@ import os
 # Add the parent directory to the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from pages.data import (
+from data import (
     load_scores,
     load_events,
     load_announcements,

@@ -6,8 +6,8 @@ import streamlit as st
 import json
 import base64
 from datetime import datetime
-from pages.theme import inject_theme, hero, section
-from pages.data import (
+from theme import inject_theme, hero, section
+from data import (
     load_scores, save_scores,
     load_events, save_events,
     load_announcements, save_announcements,

@@ -4,8 +4,8 @@ Main entrypoint page
 """
 import streamlit as st
 import datetime
-from pages.theme import inject_theme, hero, section
-from pages.data import load_announcements, load_events
+from theme import inject_theme, hero, section
+from data import load_announcements, load_events
 
 st.set_page_config(
     page_title="GCO Golf Club",

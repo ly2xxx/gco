@@ -5,8 +5,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from pages.theme import inject_theme, hero, section
-from pages.data import load_scores, save_scores, LEAGUE_TOURNAMENTS, PLAYERS
+from theme import inject_theme, hero, section
+from data import load_scores, save_scores, LEAGUE_TOURNAMENTS, PLAYERS
 from datetime import date, datetime
 from datetime import date, datetime
 

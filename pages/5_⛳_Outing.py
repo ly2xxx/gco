@@ -3,8 +3,8 @@ GCO 2026 – Outing Day (Red vs Black 对抗赛)
 """
 import streamlit as st
 import plotly.graph_objects as go
-from pages.theme import inject_theme, hero, section
-from pages.data import load_outing, save_outing
+from theme import inject_theme, hero, section
+from data import load_outing, save_outing
 
 st.set_page_config(page_title="GCO | Outing Day", page_icon="⛳", layout="wide")
 inject_theme(st)

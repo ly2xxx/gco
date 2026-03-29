@@ -3,8 +3,8 @@ GCO 2026 – Announcements page
 """
 import streamlit as st
 from datetime import date
-from pages.theme import inject_theme, hero, section
-from pages.data import load_announcements, save_announcements
+from theme import inject_theme, hero, section
+from data import load_announcements, save_announcements
 
 st.set_page_config(page_title="GCO | 公告", page_icon="📢", layout="wide")
 inject_theme(st)
