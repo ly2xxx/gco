@@ -98,11 +98,11 @@ with ql_c3:
     st.markdown("""
         <div style="background:var(--surface1); border:1px solid var(--surface3); border-radius:12px; padding:1.5rem; text-align:center; height:100%">
             <div style="font-size:3rem; margin-bottom:1rem">🤝</div>
-            <h3 style="margin:0 0 .5rem 0">对抗赛 Team Match</h3>
+            <h3 style="margin:0 0 .5rem 0">对抗赛 Outing Match</h3>
             <p style="color:var(--text-secondary); margin-bottom:1.5rem">红队🔴 vs 黑队⚫ 4场团体比洞/比分为荣誉而战</p>
         </div>
     """, unsafe_allow_html=True)
-    st.page_link("pages/5_🤝_Team.py", label="进入团队赛 Enter →")
+    st.page_link("pages/5_⛳_Outing.py", label="进入对抗赛 Enter →")
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("<br><br>", unsafe_allow_html=True)
