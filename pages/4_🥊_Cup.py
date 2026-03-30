@@ -3,6 +3,7 @@ GCO 2026 – Individual Cup (Knockout Match Play) Bracket
 """
 import streamlit as st
 import json
+import datetime
 
 import streamlit as st
 from theme import inject_theme, hero, section
@@ -17,6 +18,7 @@ cup = load_cup()
 draw = cup["draw"]        # {"P1": "刘北南", …}
 rounds = cup["rounds"]    # {"R1": […], "R2": […], …}
 byes = cup["byes"]        # ["P1", "P2", "P7", "P8"]
+play_by_dates = cup.get("play_by_dates", {})
 
 ROUND_LABELS = {"R1": "第一轮 Round 1", "R2": "第二轮 Round 2",
                 "SF": "半决赛 Semi-Final", "F": "决赛 Final"}
@@ -96,7 +98,9 @@ cols = st.columns(4)
 
 for col_idx, (rk, rl) in enumerate(ROUND_LABELS.items()):
     with cols[col_idx]:
-        st.markdown(f"<div style='text-align:center; font-weight:bold; color:var(--gold); margin-bottom:1rem;'>{rl}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='text-align:center; font-weight:bold; color:var(--gold); margin-bottom:0.2rem;'>{rl}</div>", unsafe_allow_html=True)
+        date_str = play_by_dates.get(rk, "未设置 Not Set")
+        st.markdown(f"<div style='text-align:center; font-size:0.8rem; color:#6b7280; margin-bottom:1rem;'>📅 Play by: {date_str}</div>", unsafe_allow_html=True)
         matches = rounds.get(rk, [])
         if not matches:
             st.info("待定 TBD")
@@ -164,6 +168,24 @@ for tab, (rk, rl) in zip(round_tabs, ROUND_LABELS.items()):
 
 # ── Admin: advance to next round ──────────────────────────────────────────────
 section(st, "⚙️", "管理 Admin")
+
+with st.expander("📅 设置完赛日期 Set Play-by Dates"):
+    st.write("为各个轮次设置最晚完赛日期：")
+    with st.form("play_by_form"):
+        new_dates = {}
+        for rk, rl in ROUND_LABELS.items():
+            current_date_str = play_by_dates.get(rk, "")
+            try:
+                current_date_obj = datetime.datetime.strptime(current_date_str, "%Y-%m-%d").date() if current_date_str else None
+            except ValueError:
+                current_date_obj = None
+            new_dates[rk] = st.date_input(f"{rl} 完赛日期 (Play-by Date)", value=current_date_obj)
+            
+        if st.form_submit_button("💾 保存日期 Save Dates"):
+            cup["play_by_dates"] = {k: v.strftime("%Y-%m-%d") for k, v in new_dates.items() if v}
+            save_cup(cup)
+            st.success("✅ 完赛日期已更新！")
+            st.rerun()
 
 with st.expander("🔧 推进赛程 Advance Rounds & Fixtures"):
     st.write("如需手动设置下一轮对阵，请在此填写：")
