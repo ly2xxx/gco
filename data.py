@@ -9,21 +9,21 @@ from datetime import date, datetime
 import json, os, pathlib
 
 # ── root data directory ──────────────────────────────────────────────────────
-ROOT = pathlib.Path(__file__).parent.parent
+ROOT = pathlib.Path(__file__).parent
 DATA_DIR = ROOT / "data"
 DATA_DIR.mkdir(exist_ok=True)
 BACKUP_DIR = ROOT / "backup"
 BACKUP_DIR.mkdir(exist_ok=True)
 
-def _load_latest_backup() -> dict | None:
+def _load_latest_backup() -> tuple[dict | None, pathlib.Path | None]:
     """Scan backup/ folder for latest gco_backup_*.json file."""
     try:
         backups = sorted(BACKUP_DIR.glob("gco_backup_*.json"), reverse=True)
         if backups:
-            return json.loads(backups[0].read_text(encoding="utf-8"))
+            return json.loads(backups[0].read_text(encoding="utf-8")), backups[0]
     except:
         pass
-    return None
+    return None, None
 
 def save_to_backup(state_data: dict) -> str:
     """Save app state to backup folder with timestamp."""
@@ -33,7 +33,29 @@ def save_to_backup(state_data: dict) -> str:
     return str(path)
 
 # Initialize global fallback state from latest backup if available
-_GLOBAL_BACKUP = _load_latest_backup()
+_GLOBAL_BACKUP, _LATEST_BACKUP_PATH = _load_latest_backup()
+
+def _sync_backup_to_local() -> None:
+    if not _GLOBAL_BACKUP or not _LATEST_BACKUP_PATH: return
+    backup_mtime = _LATEST_BACKUP_PATH.stat().st_mtime
+    
+    def is_backup_newer(file_name):
+        file_path = DATA_DIR / file_name
+        if not file_path.exists(): return True
+        return backup_mtime > file_path.stat().st_mtime
+        
+    if is_backup_newer("scores.csv") and "scores" in _GLOBAL_BACKUP:
+        pd.DataFrame(_GLOBAL_BACKUP["scores"]).to_csv(DATA_DIR / "scores.csv", index=False)
+    if is_backup_newer("announcements.json") and "announcements" in _GLOBAL_BACKUP:
+        (DATA_DIR / "announcements.json").write_text(json.dumps(_GLOBAL_BACKUP["announcements"], ensure_ascii=False, indent=2), encoding="utf-8")
+    if is_backup_newer("events.json") and "events" in _GLOBAL_BACKUP:
+        (DATA_DIR / "events.json").write_text(json.dumps(_GLOBAL_BACKUP["events"], ensure_ascii=False, indent=2), encoding="utf-8")
+    if is_backup_newer("cup.json") and "cup" in _GLOBAL_BACKUP:
+        (DATA_DIR / "cup.json").write_text(json.dumps(_GLOBAL_BACKUP["cup"], ensure_ascii=False, indent=2), encoding="utf-8")
+    if is_backup_newer("outing.json") and "outing" in _GLOBAL_BACKUP:
+        (DATA_DIR / "outing.json").write_text(json.dumps(_GLOBAL_BACKUP["outing"], ensure_ascii=False, indent=2), encoding="utf-8")
+
+_sync_backup_to_local()
 
 # ── Club constants ────────────────────────────────────────────────────────────
 CLUB_NAME = "GCO Golf Club"

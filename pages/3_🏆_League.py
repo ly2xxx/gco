@@ -52,7 +52,7 @@ st.dataframe(
     oom[display_cols].rename(columns={
         "Total_Net": "总净杆", "Avg_Net": "均净杆",
         "Eagles": "老鹰", "Birdies": "小鸟", "Pars": "标准",
-        "Bogeys": "柏忌", "DBogeys": "双柏忌", "Games": "轮次",
+        "Bogeys": "柏忌", "DBogeys": "双柏忌+", "Games": "轮次",
     }),
     width='stretch',
     hide_index=True,
@@ -229,32 +229,36 @@ with st.expander("📝 录入或修改成绩 Record / Edit Scores", expanded=Fal
         in_dbg = bc5.number_input("双柏忌+ D.Bogey+", min_value=0, value=int(rec.get("Double_Bogeys", 0)))
 
         if st.form_submit_button("✅ 保存成绩 Save", width='stretch'):
-            if not existing_row.empty:
-                df = df[~mask]
+            total_holes = in_eg + in_bd + in_par + in_bg + in_dbg
+            if total_holes > 18:
+                st.error(f"❌ 错误：各项击球统计之和（{total_holes}）不能超过 18 洞。 Total holes cannot exceed 18.")
+            else:
+                if not existing_row.empty:
+                    df = df[~mask]
 
-            try:
-                game_no = int(g_sel.split()[-1])
-            except:
-                game_no = 1
+                try:
+                    game_no = int(g_sel.split()[-1])
+                except:
+                    game_no = 1
 
-            new_row = pd.DataFrame([{
-                "Player": p_sel,
-                "Tournament": t_sel,
-                "Game": g_sel,
-                "Game_No": game_no,
-                "Date": str(in_date),
-                "Venue": in_venue.strip(),
-                "Net_Score": in_net,
-                "Gross_Score": in_gross,
-                "Stableford": in_stable,
-                "Eagles": in_eg,
-                "Birdies": in_bd,
-                "Pars": in_par,
-                "Bogeys": in_bg,
-                "Double_Bogeys": in_dbg,
-            }])
-            df = pd.concat([df, new_row], ignore_index=True)
-            save_scores(df)
-            st.success(f"已保存 {p_sel} 在 {t_sel} 的 {g_sel} 成绩！请刷新查看。")
-            st.rerun()
+                new_row = pd.DataFrame([{
+                    "Player": p_sel,
+                    "Tournament": t_sel,
+                    "Game": g_sel,
+                    "Game_No": game_no,
+                    "Date": str(in_date),
+                    "Venue": in_venue.strip(),
+                    "Net_Score": in_net,
+                    "Gross_Score": in_gross,
+                    "Stableford": in_stable,
+                    "Eagles": in_eg,
+                    "Birdies": in_bd,
+                    "Pars": in_par,
+                    "Bogeys": in_bg,
+                    "Double_Bogeys": in_dbg,
+                }])
+                df = pd.concat([df, new_row], ignore_index=True)
+                save_scores(df)
+                st.success(f"✅ 已保存 {p_sel} 的成绩（共记录 {total_holes} 洞）！刷新后生效。")
+                st.rerun()
 
