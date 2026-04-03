@@ -7,6 +7,7 @@ import json
 import base64
 from datetime import datetime
 from theme import inject_theme, hero, section
+from auth import is_admin_user
 from data import (
     load_scores, save_scores,
     load_events, save_events,
@@ -18,6 +19,10 @@ from data import (
 
 st.set_page_config(page_title="GCO | Data API", page_icon="💾", layout="wide")
 inject_theme(st)
+
+if not is_admin_user():
+    st.error("Unauthorized: You need admin privileges to access this page.")
+    st.stop()
 
 hero(st, "💾 Data API & Management", "Export and Import Application Data", "GCO 2026 Admin")
 

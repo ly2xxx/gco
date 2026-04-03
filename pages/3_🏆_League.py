@@ -7,7 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from theme import inject_theme, hero, section
 from data import load_scores, save_scores, LEAGUE_TOURNAMENTS, PLAYERS
-from datetime import date, datetime
+from auth import is_admin_user
 from datetime import date, datetime
 
 st.set_page_config(page_title="GCO | 联赛", page_icon="🏆", layout="wide")
@@ -176,89 +176,90 @@ if not p_df.empty:
     st.plotly_chart(fig_donut, width='stretch')
 
 # ── Admin: Record Results ─────────────────────────────────────────────────────
-section(st, "⚙️", "管理 Admin: Record Results")
+if is_admin_user():
+    section(st, "⚙️", "管理 Admin: Record Results")
 
-with st.expander("📝 录入或修改成绩 Record / Edit Scores", expanded=False):
-    t_names = list(LEAGUE_TOURNAMENTS.keys())
-    t_sel = st.selectbox("赛事 Tournament", t_names) if len(t_names) > 1 else t_names[0]
-    
-    t_info = LEAGUE_TOURNAMENTS[t_sel]
-    available_games = [f"Game {i}" for i in range(1, t_info["games"] + 1)]
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        p_sel = st.selectbox("球员 Player", PLAYERS)
-    with c2:
-        g_sel = st.selectbox("轮次 Game", available_games)
-
-    mask = (df["Player"] == p_sel) & (df["Tournament"] == t_sel) & (df["Game"] == g_sel)
-    existing_row = df[mask]
-
-    if not existing_row.empty:
-        rec = existing_row.iloc[0].to_dict()
-        st.info("💡 该场次已有成绩，保存将覆盖原纪录。 Existing record found.")
-    else:
-        rec = {
-            "Net_Score": 0, "Gross_Score": 72, "Stableford": 36,
-            "Eagles": 0, "Birdies": 0, "Pars": 0, "Bogeys": 0, "Double_Bogeys": 0
-        }
-        st.info("🆕 暂无成绩，将创建新纪录。 No existing record.")
-
-    with st.form("league_score_form"):
-        vc1, vc2 = st.columns(2)
-        def_date = date.today()
-        if "Date" in rec and __import__("pandas").notna(rec.get("Date")):
-            try:
-                def_date = datetime.strptime(str(rec["Date"]), "%Y-%m-%d").date()
-            except:
-                pass
-        in_date = vc1.date_input("日期 Date", value=def_date)
-        in_venue = vc2.text_input("场地 Venue", value=str(rec.get("Venue", "")))
-
-        sc1, sc2, sc3 = st.columns(3)
-        in_net = sc1.number_input("净杆 Net Score", value=int(rec.get("Net_Score", 0)))
-        in_gross = sc2.number_input("总杆 Gross Score", value=int(rec.get("Gross_Score", 72)))
-        in_stable = sc3.number_input("稳定福分 Stableford", value=int(rec.get("Stableford", 36)))
+    with st.expander("📝 录入或修改成绩 Record / Edit Scores", expanded=False):
+        t_names = list(LEAGUE_TOURNAMENTS.keys())
+        t_sel = st.selectbox("赛事 Tournament", t_names) if len(t_names) > 1 else t_names[0]
         
-        st.write("击球统计 Stats:")
-        bc1, bc2, bc3, bc4, bc5 = st.columns(5)
-        in_eg = bc1.number_input("老鹰 Eagle", min_value=0, value=int(rec.get("Eagles", 0)))
-        in_bd = bc2.number_input("小鸟 Birdie", min_value=0, value=int(rec.get("Birdies", 0)))
-        in_par = bc3.number_input("标准 Par", min_value=0, value=int(rec.get("Pars", 0)))
-        in_bg = bc4.number_input("柏忌 Bogey", min_value=0, value=int(rec.get("Bogeys", 0)))
-        in_dbg = bc5.number_input("双柏忌+ D.Bogey+", min_value=0, value=int(rec.get("Double_Bogeys", 0)))
+        t_info = LEAGUE_TOURNAMENTS[t_sel]
+        available_games = [f"Game {i}" for i in range(1, t_info["games"] + 1)]
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            p_sel = st.selectbox("球员 Player", PLAYERS)
+        with c2:
+            g_sel = st.selectbox("轮次 Game", available_games)
 
-        if st.form_submit_button("✅ 保存成绩 Save", width='stretch'):
-            total_holes = in_eg + in_bd + in_par + in_bg + in_dbg
-            if total_holes > 18:
-                st.error(f"❌ 错误：各项击球统计之和（{total_holes}）不能超过 18 洞。 Total holes cannot exceed 18.")
-            else:
-                if not existing_row.empty:
-                    df = df[~mask]
+        mask = (df["Player"] == p_sel) & (df["Tournament"] == t_sel) & (df["Game"] == g_sel)
+        existing_row = df[mask]
 
+        if not existing_row.empty:
+            rec = existing_row.iloc[0].to_dict()
+            st.info("💡 该场次已有成绩，保存将覆盖原纪录。 Existing record found.")
+        else:
+            rec = {
+                "Net_Score": 0, "Gross_Score": 72, "Stableford": 36,
+                "Eagles": 0, "Birdies": 0, "Pars": 0, "Bogeys": 0, "Double_Bogeys": 0
+            }
+            st.info("🆕 暂无成绩，将创建新纪录。 No existing record.")
+
+        with st.form("league_score_form"):
+            vc1, vc2 = st.columns(2)
+            def_date = date.today()
+            if "Date" in rec and __import__("pandas").notna(rec.get("Date")):
                 try:
-                    game_no = int(g_sel.split()[-1])
+                    def_date = datetime.strptime(str(rec["Date"]), "%Y-%m-%d").date()
                 except:
-                    game_no = 1
+                    pass
+            in_date = vc1.date_input("日期 Date", value=def_date)
+            in_venue = vc2.text_input("场地 Venue", value=str(rec.get("Venue", "")))
 
-                new_row = pd.DataFrame([{
-                    "Player": p_sel,
-                    "Tournament": t_sel,
-                    "Game": g_sel,
-                    "Game_No": game_no,
-                    "Date": str(in_date),
-                    "Venue": in_venue.strip(),
-                    "Net_Score": in_net,
-                    "Gross_Score": in_gross,
-                    "Stableford": in_stable,
-                    "Eagles": in_eg,
-                    "Birdies": in_bd,
-                    "Pars": in_par,
-                    "Bogeys": in_bg,
-                    "Double_Bogeys": in_dbg,
-                }])
-                df = pd.concat([df, new_row], ignore_index=True)
-                save_scores(df)
-                st.success(f"✅ 已保存 {p_sel} 的成绩（共记录 {total_holes} 洞）！刷新后生效。")
-                st.rerun()
+            sc1, sc2, sc3 = st.columns(3)
+            in_net = sc1.number_input("净杆 Net Score", value=int(rec.get("Net_Score", 0)))
+            in_gross = sc2.number_input("总杆 Gross Score", value=int(rec.get("Gross_Score", 72)))
+            in_stable = sc3.number_input("稳定福分 Stableford", value=int(rec.get("Stableford", 36)))
+            
+            st.write("击球统计 Stats:")
+            bc1, bc2, bc3, bc4, bc5 = st.columns(5)
+            in_eg = bc1.number_input("老鹰 Eagle", min_value=0, value=int(rec.get("Eagles", 0)))
+            in_bd = bc2.number_input("小鸟 Birdie", min_value=0, value=int(rec.get("Birdies", 0)))
+            in_par = bc3.number_input("标准 Par", min_value=0, value=int(rec.get("Pars", 0)))
+            in_bg = bc4.number_input("柏忌 Bogey", min_value=0, value=int(rec.get("Bogeys", 0)))
+            in_dbg = bc5.number_input("双柏忌+ D.Bogey+", min_value=0, value=int(rec.get("Double_Bogeys", 0)))
+
+            if st.form_submit_button("✅ 保存成绩 Save", width='stretch'):
+                total_holes = in_eg + in_bd + in_par + in_bg + in_dbg
+                if total_holes > 18:
+                    st.error(f"❌ 错误：各项击球统计之和（{total_holes}）不能超过 18 洞。 Total holes cannot exceed 18.")
+                else:
+                    if not existing_row.empty:
+                        df = df[~mask]
+
+                    try:
+                        game_no = int(g_sel.split()[-1])
+                    except:
+                        game_no = 1
+
+                    new_row = pd.DataFrame([{
+                        "Player": p_sel,
+                        "Tournament": t_sel,
+                        "Game": g_sel,
+                        "Game_No": game_no,
+                        "Date": str(in_date),
+                        "Venue": in_venue.strip(),
+                        "Net_Score": in_net,
+                        "Gross_Score": in_gross,
+                        "Stableford": in_stable,
+                        "Eagles": in_eg,
+                        "Birdies": in_bd,
+                        "Pars": in_par,
+                        "Bogeys": in_bg,
+                        "Double_Bogeys": in_dbg,
+                    }])
+                    df = pd.concat([df, new_row], ignore_index=True)
+                    save_scores(df)
+                    st.success(f"✅ 已保存 {p_sel} 的成绩（共记录 {total_holes} 洞）！刷新后生效。")
+                    st.rerun()
 

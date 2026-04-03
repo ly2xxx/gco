@@ -5,6 +5,7 @@ import streamlit as st
 from datetime import date, datetime
 from theme import inject_theme, hero, section, EVENT_COLORS
 from data import load_events, save_events
+from auth import is_admin_user
 
 st.set_page_config(page_title="GCO | 赛历", page_icon="📅", layout="wide")
 inject_theme(st)
@@ -76,28 +77,29 @@ else:
     st.html(all_cards_html)
 
 # ── Admin: add / edit events ──────────────────────────────────────────────────
-section(st, "⚙️", "管理赛事")
+if is_admin_user():
+    section(st, "⚙️", "管理赛事")
 
-with st.expander("➕ 添加赛事 / Add Event", expanded=False):
-    with st.form("add_event_form", clear_on_submit=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            ev_name = st.text_input("赛事名称 Name *")
-            ev_date_input = st.date_input("日期 Date", value=date.today())
-        with c2:
-            ev_type = st.selectbox("类型 Type", ["League", "Cup", "Outing", "Grand Final"])
-            ev_details = st.text_input("详情 Details", placeholder="Format, venue, etc.")
-        submitted = st.form_submit_button("➕ 添加 Add", width='stretch')
-        if submitted:
-            if not ev_name.strip():
-                st.error("请填写赛事名称！")
-            else:
-                events.append({
-                    "date": str(ev_date_input),
-                    "name": ev_name.strip(),
-                    "type": ev_type,
-                    "details": ev_details.strip(),
-                })
-                save_events(events)
-                st.success("✅ 赛事已添加！请刷新查看。")
-                st.rerun()
+    with st.expander("➕ 添加赛事 / Add Event", expanded=False):
+        with st.form("add_event_form", clear_on_submit=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                ev_name = st.text_input("赛事名称 Name *")
+                ev_date_input = st.date_input("日期 Date", value=date.today())
+            with c2:
+                ev_type = st.selectbox("类型 Type", ["League", "Cup", "Outing", "Grand Final"])
+                ev_details = st.text_input("详情 Details", placeholder="Format, venue, etc.")
+            submitted = st.form_submit_button("➕ 添加 Add", width='stretch')
+            if submitted:
+                if not ev_name.strip():
+                    st.error("请填写赛事名称！")
+                else:
+                    events.append({
+                        "date": str(ev_date_input),
+                        "name": ev_name.strip(),
+                        "type": ev_type,
+                        "details": ev_details.strip(),
+                    })
+                    save_events(events)
+                    st.success("✅ 赛事已添加！请刷新查看。")
+                    st.rerun()

@@ -8,6 +8,7 @@ import datetime
 import streamlit as st
 from theme import inject_theme, hero, section
 from data import load_cup, save_cup, PLAYERS
+from auth import is_admin_user
 
 st.set_page_config(page_title="GCO | 个人杯赛", page_icon="🥊", layout="wide")
 inject_theme(st)
@@ -140,94 +141,95 @@ for col_idx, (rk, rl) in enumerate(ROUND_LABELS.items()):
                 st.html(m_html)
 
 # ── Record Match Result Forms ─────────────────────────────────────────────────
-section(st, "✏️", "录入赛果 Record Results")
-round_tabs = st.tabs(list(ROUND_LABELS.values()))
-for tab, (rk, rl) in zip(round_tabs, ROUND_LABELS.items()):
-    with tab:
-        matches = rounds.get(rk, [])
-        if matches:
-            with st.form(f"form_{rk}"):
-                match_options = [m["match"] for m in matches if not m.get("winner")]
-                if not match_options:
-                    st.success("✅ 本轮所有比赛结果已录入。")
+if is_admin_user():
+    section(st, "✏️", "录入赛果 Record Results")
+    round_tabs = st.tabs(list(ROUND_LABELS.values()))
+    for tab, (rk, rl) in zip(round_tabs, ROUND_LABELS.items()):
+        with tab:
+            matches = rounds.get(rk, [])
+            if matches:
+                with st.form(f"form_{rk}"):
+                    match_options = [m["match"] for m in matches if not m.get("winner")]
+                    if not match_options:
+                        st.success("✅ 本轮所有比赛结果已录入。")
+                    else:
+                        chosen_match = st.selectbox("选择对阵", match_options)
+                        m_obj = next(m for m in matches if m["match"] == chosen_match)
+                        slots2 = chosen_match.split(" vs ")
+                        p1n = draw.get(slots2[0], slots2[0])
+                        p2n = draw.get(slots2[1], slots2[1]) if len(slots2) > 1 else "TBD"
+                        winner_choice = st.radio("胜者 Winner", [p1n, p2n], horizontal=True)
+                        score_input = st.text_input("比分 Score (e.g. 3&2)", "")
+                        if st.form_submit_button("💾 保存 Save"):
+                            winner_slot_save = slots2[0] if winner_choice == p1n else slots2[1]
+                            m_obj["winner"] = winner_slot_save
+                            m_obj["score"] = score_input.strip()
+                            save_cup(cup)
+                            st.success(f"✅ 已记录：{winner_choice} 获胜！")
+                            st.rerun()
+
+    # ── Admin: advance to next round ──────────────────────────────────────────────
+    section(st, "⚙️", "管理 Admin")
+
+    with st.expander("📅 设置完赛日期 Set Play-by Dates"):
+        st.write("为各个轮次设置最晚完赛日期：")
+        with st.form("play_by_form"):
+            new_dates = {}
+            for rk, rl in ROUND_LABELS.items():
+                current_date_str = play_by_dates.get(rk, "")
+                try:
+                    current_date_obj = datetime.datetime.strptime(current_date_str, "%Y-%m-%d").date() if current_date_str else None
+                except ValueError:
+                    current_date_obj = None
+                new_dates[rk] = st.date_input(f"{rl} 完赛日期 (Play-by Date)", value=current_date_obj)
+                
+            if st.form_submit_button("💾 保存日期 Save Dates"):
+                cup["play_by_dates"] = {k: v.strftime("%Y-%m-%d") for k, v in new_dates.items() if v}
+                save_cup(cup)
+                st.success("✅ 完赛日期已更新！")
+                st.rerun()
+
+    with st.expander("🔧 推进赛程 Advance Rounds & Fixtures"):
+        st.write("如需手动设置下一轮对阵，请在此填写：")
+        with st.form("advance_form"):
+            rk_select = st.selectbox("目标轮次 Target Round", ["R1", "R2", "SF", "F"])
+            match_input = st.text_area(
+                "对阵（每行一场，格式：P1 vs P3/P4之间的胜者 → 填写slot，如 P1 vs P3）\n"
+                "If someone has a BYE, just put their slot (e.g. P1)",
+                placeholder="P1 vs P3\nP2 vs P5\nP7 vs P9\nP8 vs P11"
+            )
+            home_input = st.text_area("主场权（每行，格式 P1）", placeholder="P1\nP2\nP7\nP8")
+            if st.form_submit_button("➕ 设置对阵 Set Fixtures"):
+                match_lines = [ln.strip() for ln in match_input.strip().split("\n") if ln.strip()]
+                home_lines = [ln.strip() for ln in home_input.strip().split("\n") if ln.strip()]
+                new_matches = []
+                for idx, ml in enumerate(match_lines):
+                    hm = home_lines[idx] if idx < len(home_lines) else None
+                    new_matches.append({"match": ml, "home": hm, "winner": None, "score": ""})
+                cup["rounds"][rk_select] = new_matches
+                save_cup(cup)
+                st.success(f"✅ {ROUND_LABELS[rk_select]} 对阵已设置！")
+                st.rerun()
+
+    with st.expander("👥 管理初始抽签名单 Manage Initial Draw"):
+        st.write("将球员分配至抽签位 (Assign players to draw slots):")
+        with st.form("manage_draw_form"):
+            # We need P1 through P12, maybe up to P16
+            new_draw = {}
+            for i in range(1, 13):
+                slot = f"P{i}"
+                current_val = draw.get(slot, "")
+                # Provide an empty option as default
+                player_opts = ["TBD"] + PLAYERS
+                if current_val in player_opts:
+                    idx = player_opts.index(current_val)
                 else:
-                    chosen_match = st.selectbox("选择对阵", match_options)
-                    m_obj = next(m for m in matches if m["match"] == chosen_match)
-                    slots2 = chosen_match.split(" vs ")
-                    p1n = draw.get(slots2[0], slots2[0])
-                    p2n = draw.get(slots2[1], slots2[1]) if len(slots2) > 1 else "TBD"
-                    winner_choice = st.radio("胜者 Winner", [p1n, p2n], horizontal=True)
-                    score_input = st.text_input("比分 Score (e.g. 3&2)", "")
-                    if st.form_submit_button("💾 保存 Save"):
-                        winner_slot_save = slots2[0] if winner_choice == p1n else slots2[1]
-                        m_obj["winner"] = winner_slot_save
-                        m_obj["score"] = score_input.strip()
-                        save_cup(cup)
-                        st.success(f"✅ 已记录：{winner_choice} 获胜！")
-                        st.rerun()
-
-# ── Admin: advance to next round ──────────────────────────────────────────────
-section(st, "⚙️", "管理 Admin")
-
-with st.expander("📅 设置完赛日期 Set Play-by Dates"):
-    st.write("为各个轮次设置最晚完赛日期：")
-    with st.form("play_by_form"):
-        new_dates = {}
-        for rk, rl in ROUND_LABELS.items():
-            current_date_str = play_by_dates.get(rk, "")
-            try:
-                current_date_obj = datetime.datetime.strptime(current_date_str, "%Y-%m-%d").date() if current_date_str else None
-            except ValueError:
-                current_date_obj = None
-            new_dates[rk] = st.date_input(f"{rl} 完赛日期 (Play-by Date)", value=current_date_obj)
-            
-        if st.form_submit_button("💾 保存日期 Save Dates"):
-            cup["play_by_dates"] = {k: v.strftime("%Y-%m-%d") for k, v in new_dates.items() if v}
-            save_cup(cup)
-            st.success("✅ 完赛日期已更新！")
-            st.rerun()
-
-with st.expander("🔧 推进赛程 Advance Rounds & Fixtures"):
-    st.write("如需手动设置下一轮对阵，请在此填写：")
-    with st.form("advance_form"):
-        rk_select = st.selectbox("目标轮次 Target Round", ["R1", "R2", "SF", "F"])
-        match_input = st.text_area(
-            "对阵（每行一场，格式：P1 vs P3/P4之间的胜者 → 填写slot，如 P1 vs P3）\n"
-            "If someone has a BYE, just put their slot (e.g. P1)",
-            placeholder="P1 vs P3\nP2 vs P5\nP7 vs P9\nP8 vs P11"
-        )
-        home_input = st.text_area("主场权（每行，格式 P1）", placeholder="P1\nP2\nP7\nP8")
-        if st.form_submit_button("➕ 设置对阵 Set Fixtures"):
-            match_lines = [ln.strip() for ln in match_input.strip().split("\n") if ln.strip()]
-            home_lines = [ln.strip() for ln in home_input.strip().split("\n") if ln.strip()]
-            new_matches = []
-            for idx, ml in enumerate(match_lines):
-                hm = home_lines[idx] if idx < len(home_lines) else None
-                new_matches.append({"match": ml, "home": hm, "winner": None, "score": ""})
-            cup["rounds"][rk_select] = new_matches
-            save_cup(cup)
-            st.success(f"✅ {ROUND_LABELS[rk_select]} 对阵已设置！")
-            st.rerun()
-
-with st.expander("👥 管理初始抽签名单 Manage Initial Draw"):
-    st.write("将球员分配至抽签位 (Assign players to draw slots):")
-    with st.form("manage_draw_form"):
-        # We need P1 through P12, maybe up to P16
-        new_draw = {}
-        for i in range(1, 13):
-            slot = f"P{i}"
-            current_val = draw.get(slot, "")
-            # Provide an empty option as default
-            player_opts = ["TBD"] + PLAYERS
-            if current_val in player_opts:
-                idx = player_opts.index(current_val)
-            else:
-                idx = 0
-            selected_p = st.selectbox(f"Slot {slot}", player_opts, index=idx, key=f"sel_{slot}")
-            new_draw[slot] = selected_p
-            
-        if st.form_submit_button("💾 保存名单 Save Draw Configuration"):
-            cup["draw"] = new_draw
-            save_cup(cup)
-            st.success("✅ 抽签名单已更新！")
-            st.rerun()
+                    idx = 0
+                selected_p = st.selectbox(f"Slot {slot}", player_opts, index=idx, key=f"sel_{slot}")
+                new_draw[slot] = selected_p
+                
+            if st.form_submit_button("💾 保存名单 Save Draw Configuration"):
+                cup["draw"] = new_draw
+                save_cup(cup)
+                st.success("✅ 抽签名单已更新！")
+                st.rerun()

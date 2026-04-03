@@ -5,6 +5,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from theme import inject_theme, hero, section
 from data import load_outing, save_outing
+from auth import is_admin_user
 
 st.set_page_config(page_title="GCO | Outing Day", page_icon="⛳", layout="wide")
 inject_theme(st)
@@ -106,22 +107,23 @@ for m in matches:
             </div>
             """, unsafe_allow_html=True)
             
-    with st.expander(f"⚙️ 更新 {m['name']} 赛果"):
-        with st.form(f"outing_form_{m['id']}"):
-            st.write(f"录入 **{m['name']}** 的得分")
-            col_in1, col_in2, col_in3 = st.columns(3)
-            with col_in1:
-                new_red = st.number_input("🔴 红队得分", min_value=0.0, max_value=2.0, step=0.5, value=float(m["red_score"] or 0))
-            with col_in2:
-                new_black = st.number_input("⚫ 黑队得分", min_value=0.0, max_value=2.0, step=0.5, value=float(m["black_score"] or 0))
-            with col_in3:
-                new_status = st.selectbox("状态 Status", ["upcoming", "completed"], index=1 if is_done else 0)
-            
-            if st.form_submit_button("✅ 保存更新 Update"):
-                m["red_score"] = new_red
-                m["black_score"] = new_black
-                m["status"] = new_status
-                save_outing(outing_data)
-                st.success("比赛结果已更新！")
-                st.rerun()
+    if is_admin_user():
+        with st.expander(f"⚙️ 更新 {m['name']} 赛果"):
+            with st.form(f"outing_form_{m['id']}"):
+                st.write(f"录入 **{m['name']}** 的得分")
+                col_in1, col_in2, col_in3 = st.columns(3)
+                with col_in1:
+                    new_red = st.number_input("🔴 红队得分", min_value=0.0, max_value=2.0, step=0.5, value=float(m["red_score"] or 0))
+                with col_in2:
+                    new_black = st.number_input("⚫ 黑队得分", min_value=0.0, max_value=2.0, step=0.5, value=float(m["black_score"] or 0))
+                with col_in3:
+                    new_status = st.selectbox("状态 Status", ["upcoming", "completed"], index=1 if is_done else 0)
+                
+                if st.form_submit_button("✅ 保存更新 Update"):
+                    m["red_score"] = new_red
+                    m["black_score"] = new_black
+                    m["status"] = new_status
+                    save_outing(outing_data)
+                    st.success("比赛结果已更新！")
+                    st.rerun()
     st.markdown("---")
