@@ -14,7 +14,7 @@ from data import (
     load_announcements, save_announcements,
     load_cup, save_cup,
     load_outing, save_outing,
-    save_to_backup
+    save_to_backup, list_backups, compute_diff
 )
 
 st.set_page_config(page_title="GCO | Data API", page_icon="💾", layout="wide")
@@ -89,3 +89,49 @@ with c2:
 st.markdown("---")
 section(st, "🧑‍💻", "Raw JSON Developer Preview")
 st.json(state_data, expanded=False)
+
+# ── Restore from Backup ───────────────────────────────────────────────────────
+st.markdown("---")
+section(st, "♻️", "Restore from Backup")
+
+backups = list_backups()
+if not backups:
+    st.info("No backup files found in the backup/ folder.")
+else:
+    # Build dropdown options
+    backup_options = [f"{b['filename']} ({b['date']})" for b in backups]
+    selected = st.selectbox("Select a backup to restore:", backup_options, index=0)
+    
+    if selected:
+        idx = backup_options.index(selected)
+        backup = backups[idx]
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            st.markdown("**📄 Backup Contents:**")
+            with st.expander("View backup JSON"):
+                st.json(backup["data"], expanded=False)
+        
+        with col2:
+            st.markdown("**🔄 Diff with Current Data:**")
+            diff = compute_diff(backup["data"], state_data)
+            if not diff:
+                st.success("✅ Backup is identical to current data")
+            else:
+                st.warning(f"⚠️ {len(diff)} section(s) differ:")
+                for section_name, values in diff.items():
+                    with st.expander(f"Changed: {section_name}"):
+                        st.markdown("**Backup version:**")
+                        st.json(values["backup"], expanded=False)
+                        st.markdown("**Current version:**")
+                        st.json(values["current"], expanded=False)
+        
+        # Revert button
+        st.markdown("---")
+        st.error("⚠️ **Warning:** Restoring will OVERWRITE all current data with the backup version!")
+        
+        if st.button("🚨 CONFIRM RESTORE FROM BACKUP", type="primary"):
+            import_app_state(backup["data"])
+            st.success("✅ Data successfully restored from backup! Please refresh the application.")
+            st.balloons()

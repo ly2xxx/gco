@@ -1392,3 +1392,33 @@ def load_outing() -> dict:
 
 def save_outing(outing: dict) -> None:
     OUTING_FILE.write_text(json.dumps(outing, ensure_ascii=False, indent=2), encoding="utf-8")
+
+# ── Backup management ────────────────────────────────────────────────────────────
+def list_backups() -> list[dict]:
+    """List all backup files with metadata."""
+    backups = []
+    for path in sorted(BACKUP_DIR.glob("gco_backup_*.json"), reverse=True):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            backups.append({
+                "filename": path.name,
+                "path": str(path),
+                "date": data.get("export_date", path.stem.replace("gco_backup_", "")),
+                "data": data
+            })
+        except:
+            pass
+    return backups
+
+def compute_diff(backup: dict, current: dict) -> dict:
+    """Compute differences between backup and current state."""
+    diff = {}
+    all_keys = set(backup.keys()) | set(current.keys())
+    for key in all_keys:
+        if key in ("version", "export_date"):
+            continue
+        b = backup.get(key)
+        c = current.get(key)
+        if b != c:
+            diff[key] = {"backup": b, "current": c}
+    return diff
