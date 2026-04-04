@@ -158,22 +158,22 @@ else:
                             return str(v)[:120]
 
                         rows_html += (
-                            f"<tr style='background:{bg}'>"
-                            f"<td style='padding:4px 8px;white-space:nowrap'><b>{field_val}</b></td>"
-                            f"<td style='padding:4px 8px;color:#555;font-size:0.8em'>{icon}</td>"
-                            f"<td style='padding:4px 8px;font-size:0.82em'>{_fmt(d['backup'])}</td>"
-                            f"<td style='padding:4px 8px;font-size:0.82em'>{_fmt(d['current'])}</td>"
+                            f"<tr style='background:{bg};color:#1a1a1a'>"
+                            f"<td style='padding:4px 8px;white-space:nowrap;color:#1a1a1a'><b>{field_val}</b></td>"
+                            f"<td style='padding:4px 8px;color:#444;font-size:0.8em'>{icon}</td>"
+                            f"<td style='padding:4px 8px;font-size:0.82em;color:#1a1a1a'>{_fmt(d['backup'])}</td>"
+                            f"<td style='padding:4px 8px;font-size:0.82em;color:#1a1a1a'>{_fmt(d['current'])}</td>"
                             f"</tr>"
                         )
 
                     table_html = f"""
-<table style='width:100%;border-collapse:collapse;font-family:sans-serif'>
+<table style='width:100%;border-collapse:collapse;font-family:sans-serif;color:#1a1a1a'>
   <thead>
-    <tr style='background:#f0f0f0'>
-      <th style='padding:4px 8px;text-align:left'>Record / Field</th>
-      <th style='padding:4px 8px;text-align:left'>Change</th>
-      <th style='padding:4px 8px;text-align:left'>Backup value</th>
-      <th style='padding:4px 8px;text-align:left'>Current value</th>
+    <tr style='background:#d0d8d4;color:#1a1a1a'>
+      <th style='padding:4px 8px;text-align:left;color:#1a1a1a'>Record / Field</th>
+      <th style='padding:4px 8px;text-align:left;color:#1a1a1a'>Change</th>
+      <th style='padding:4px 8px;text-align:left;color:#1a1a1a'>Backup value</th>
+      <th style='padding:4px 8px;text-align:left;color:#1a1a1a'>Current value</th>
     </tr>
   </thead>
   <tbody>{rows_html}</tbody>
