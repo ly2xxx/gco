@@ -1411,14 +1411,86 @@ def list_backups() -> list[dict]:
     return backups
 
 def compute_diff(backup: dict, current: dict) -> dict:
-    """Compute differences between backup and current state."""
-    diff = {}
+    """Compute granular differences between backup and current state.
+
+    Returns a dict keyed by section name. Each value contains:
+      - "summary": short human-readable description
+      - "details": list of change dicts with keys "field", "backup", "current", "change_type"
+        change_type is one of: "added", "removed", "changed"
+    For list sections (scores, events, announcements) each record is compared
+    individually; for dict sections (cup, outing) top-level keys are compared.
+    """
+    diff: dict = {}
     all_keys = set(backup.keys()) | set(current.keys())
+
     for key in all_keys:
         if key in ("version", "export_date"):
             continue
         b = backup.get(key)
         c = current.get(key)
-        if b != c:
-            diff[key] = {"backup": b, "current": c}
+        if b == c:
+            continue
+
+        details: list[dict] = []
+
+        if isinstance(b, list) and isinstance(c, list):
+            # ── List comparison: treat each element as a record ──────────────
+            # Convert to JSON strings so we can do membership checks on dicts
+            b_strs = [json.dumps(item, ensure_ascii=False, sort_keys=True) for item in b]
+            c_strs = [json.dumps(item, ensure_ascii=False, sort_keys=True) for item in c]
+            b_set = set(b_strs)
+            c_set = set(c_strs)
+
+            removed = b_set - c_set
+            added = c_set - b_set
+
+            for s in removed:
+                item = json.loads(s)
+                label = _record_label(key, item)
+                details.append({"field": label, "backup": item, "current": "(removed)", "change_type": "removed"})
+            for s in added:
+                item = json.loads(s)
+                label = _record_label(key, item)
+                details.append({"field": label, "backup": "(added)", "current": item, "change_type": "added"})
+
+            n_removed = len(removed)
+            n_added = len(added)
+            parts = []
+            if n_removed:
+                parts.append(f"{n_removed} removed")
+            if n_added:
+                parts.append(f"{n_added} added")
+            summary = ", ".join(parts) if parts else "reordered"
+
+        elif isinstance(b, dict) and isinstance(c, dict):
+            # ── Dict comparison: key-by-key ───────────────────────────────────
+            all_sub = set(b.keys()) | set(c.keys())
+            for sub_key in sorted(all_sub):
+                bv = b.get(sub_key)
+                cv = c.get(sub_key)
+                if bv == cv:
+                    continue
+                change_type = "added" if bv is None else "removed" if cv is None else "changed"
+                details.append({"field": sub_key, "backup": bv, "current": cv, "change_type": change_type})
+            n = len(details)
+            summary = f"{n} field(s) changed"
+
+        else:
+            # ── Scalar / type mismatch ────────────────────────────────────────
+            details.append({"field": key, "backup": b, "current": c, "change_type": "changed"})
+            summary = "value changed"
+
+        diff[key] = {"summary": summary, "details": details}
+
     return diff
+
+
+def _record_label(section: str, record: dict) -> str:
+    """Return a short human-readable label for a list record."""
+    if section == "scores":
+        return f"{record.get('Player', '?')} – {record.get('Game', '?')}"
+    if section == "events":
+        return record.get("title") or record.get("name") or record.get("id") or str(record)[:60]
+    if section == "announcements":
+        return record.get("title") or record.get("message", "")[:60] or str(record)[:60]
+    return str(record)[:60]
