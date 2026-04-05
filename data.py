@@ -1393,6 +1393,33 @@ def load_outing() -> dict:
 def save_outing(outing: dict) -> None:
     OUTING_FILE.write_text(json.dumps(outing, ensure_ascii=False, indent=2), encoding="utf-8")
 
+# ── State Export/Import ────────────────────────────────────────────────────────────
+def export_app_state() -> dict:
+    """Export all application state as a dictionary."""
+    return {
+        "version": "1.0",
+        "export_date": datetime.now().isoformat(),
+        "events": load_events(),
+        "announcements": load_announcements(),
+        "cup": load_cup(),
+        "outing": load_outing(),
+        "scores": load_scores().to_dict(orient="records"),
+    }
+
+def import_app_state(state: dict) -> None:
+    """Import application state from a dictionary."""
+    if "events" in state:
+        save_events(state["events"])
+    if "announcements" in state:
+        save_announcements(state["announcements"])
+    if "cup" in state:
+        save_cup(state["cup"])
+    if "outing" in state:
+        save_outing(state["outing"])
+    if "scores" in state:
+        df = pd.DataFrame(state["scores"])
+        save_scores(df)
+
 # ── Backup management ────────────────────────────────────────────────────────────
 def list_backups() -> list[dict]:
     """List all backup files with metadata."""

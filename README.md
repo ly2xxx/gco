@@ -88,14 +88,30 @@ streamlit run streamlit_app.py
 - **Export Functionality**: Download filtered data as CSV
 - **Real-time Updates**: Automatic refresh from Google Sheets
 
-Run the comprehensive test suite:
+### Automated Testing
+
+Run the comprehensive unit test suite:
 
 ```bash
-# Run all tests using uv
+# Run all unit tests using uv
 uv run pytest test_streamlit_app.py -v
 
 # Run with coverage report
 uv run pytest test_streamlit_app.py --cov=streamlit_app --cov-report=html
+```
+
+### BDD Integration Tests
+
+Run the behavior-driven integration tests using [behave](https://behave.readthedocs.io/):
+
+```bash
+# Run all BDD tests
+uv run behave
+
+# Run tests with specific tags
+uv run behave --tags=@data       # Data loading tests
+uv run behave --tags=@backup     # Backup management tests
+uv run behave --tags=@validation # Data validation tests
 ```
 
 ### Test Coverage
