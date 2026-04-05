@@ -50,67 +50,67 @@ Feature: Data Export/Import # features/02_data_export_import.feature:3
   Scenario: Save backup to file                                  # features/02_data_export_import.feature:19
     Given I have application state                               # features/steps/data_layer_steps.py:201
     When I save to backup                                        # features/steps/data_layer_steps.py:207
-    Then a backup file should be created in the backup directory # features/steps/data_layer_steps.py:213
+    Then a backup file should be created in the backup directory # features/steps/data_layer_steps.py:217
 
 Feature: Backup Management # features/03_backup_management.feature:3
   As a system admin
   I need to manage backup files
   So that I can restore previous states
   Scenario: List available backups                     # features/03_backup_management.feature:8
-    Given backup files exist in the backup directory   # features/steps/data_layer_steps.py:222
-    When I list the backups                            # features/steps/data_layer_steps.py:230
-    Then I should get a list of backups sorted by date # features/steps/data_layer_steps.py:236
+    Given backup files exist in the backup directory   # features/steps/data_layer_steps.py:226
+    When I list the backups                            # features/steps/data_layer_steps.py:237
+    Then I should get a list of backups sorted by date # features/steps/data_layer_steps.py:243
 
   Scenario: Compute diff between backup and current    # features/03_backup_management.feature:13
-    Given I have a backup and current state            # features/steps/data_layer_steps.py:242
-    When I compute the diff                            # features/steps/data_layer_steps.py:251
-    Then I should get a dictionary showing differences # features/steps/data_layer_steps.py:257
+    Given I have a backup and current state            # features/steps/data_layer_steps.py:249
+    When I compute the diff                            # features/steps/data_layer_steps.py:258
+    Then I should get a dictionary showing differences # features/steps/data_layer_steps.py:264
 
 Feature: Player Management # features/04_player_management.feature:3
   As a league administrator
   I need to manage player information
   So that the league operates correctly
   Scenario: Load player list     # features/04_player_management.feature:8
-    Given the club has players   # features/steps/data_layer_steps.py:265
-    When I load the player list  # features/steps/data_layer_steps.py:271
-    Then I should get 13 players # features/steps/data_layer_steps.py:277
+    Given the club has players   # features/steps/data_layer_steps.py:272
+    When I load the player list  # features/steps/data_layer_steps.py:278
+    Then I should get 13 players # features/steps/data_layer_steps.py:284
 
   Scenario: Verify team assignments      # features/04_player_management.feature:13
-    Given players are assigned to teams  # features/steps/data_layer_steps.py:283
-    When I check team assignments        # features/steps/data_layer_steps.py:290
-    Then Red Team should have 6 players  # features/steps/data_layer_steps.py:297
-    And Black Team should have 7 players # features/steps/data_layer_steps.py:303
+    Given players are assigned to teams  # features/steps/data_layer_steps.py:290
+    When I check team assignments        # features/steps/data_layer_steps.py:297
+    Then Red Team should have 6 players  # features/steps/data_layer_steps.py:304
+    And Black Team should have 7 players # features/steps/data_layer_steps.py:310
 
 Feature: Tournament Management # features/05_tournament_management.feature:3
   As a league administrator
   I need to manage tournament data
   So that tournament results are displayed correctly
   Scenario: Verify league tournaments exist      # features/05_tournament_management.feature:8
-    Given tournaments are defined                # features/steps/data_layer_steps.py:311
-    When I check league tournaments              # features/steps/data_layer_steps.py:317
-    Then there should be at least one tournament # features/steps/data_layer_steps.py:323
+    Given tournaments are defined                # features/steps/data_layer_steps.py:318
+    When I check league tournaments              # features/steps/data_layer_steps.py:324
+    Then there should be at least one tournament # features/steps/data_layer_steps.py:330
 
   Scenario: Verify outing matches exist   # features/05_tournament_management.feature:13
-    Given outing matches are defined      # features/steps/data_layer_steps.py:329
-    When I check outing matches           # features/steps/data_layer_steps.py:335
-    Then there should be 4 outing matches # features/steps/data_layer_steps.py:341
+    Given outing matches are defined      # features/steps/data_layer_steps.py:336
+    When I check outing matches           # features/steps/data_layer_steps.py:342
+    Then there should be 4 outing matches # features/steps/data_layer_steps.py:348
 
 Feature: Data Validation # features/06_data_validation.feature:3
   As a data integrity system
   I need to validate data structures
   So that the application doesn't crash on invalid data
   Scenario: Scores DataFrame structure                                                                                                               # features/06_data_validation.feature:8
-    Given scores data is loaded                                                                                                                      # features/steps/data_layer_steps.py:349
-    When I validate the DataFrame structure                                                                                                          # features/steps/data_layer_steps.py:355
-    Then it should have required columns: Player, Tournament, Game, Net_Score, Gross_Score, Birdies, Pars, Bogeys, Double_Bogeys, Eagles, Stableford # features/steps/data_layer_steps.py:361
+    Given scores data is loaded                                                                                                                      # features/steps/data_layer_steps.py:356
+    When I validate the DataFrame structure                                                                                                          # features/steps/data_layer_steps.py:362
+    Then it should have required columns: Player, Tournament, Game, Net_Score, Gross_Score, Birdies, Pars, Bogeys, Double_Bogeys, Eagles, Stableford # features/steps/data_layer_steps.py:368
 
   Scenario: Events have required fields            # features/06_data_validation.feature:13
-    Given events are loaded                        # features/steps/data_layer_steps.py:369
-    When I validate an event                       # features/steps/data_layer_steps.py:375
-    Then it should have: date, name, type, details # features/steps/data_layer_steps.py:384
+    Given events are loaded                        # features/steps/data_layer_steps.py:376
+    When I validate an event                       # features/steps/data_layer_steps.py:382
+    Then it should have: date, name, type, details # features/steps/data_layer_steps.py:391
 
   Scenario: Announcements have required fields                         # features/06_data_validation.feature:18
-    Given announcements are loaded                                     # features/steps/data_layer_steps.py:400
-    When I validate announcement structure                             # features/steps/data_layer_steps.py:406
-    Then announcement should have id, title, date, author, body fields # features/steps/data_layer_steps.py:392
+    Given announcements are loaded                                     # features/steps/data_layer_steps.py:407
+    When I validate announcement structure                             # features/steps/data_layer_steps.py:413
+    Then announcement should have id, title, date, author, body fields # features/steps/data_layer_steps.py:399
 

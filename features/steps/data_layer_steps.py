@@ -207,7 +207,11 @@ def step_have_state(context):
 @when('I save to backup')
 def step_save_backup(context):
     """Save backup"""
-    context.backup_path = save_to_backup(context.state_to_backup)
+    path = save_to_backup(context.state_to_backup)
+    context.backup_path = path
+    if not hasattr(context, 'created_backups'):
+        context.created_backups = []
+    context.created_backups.append(path)
 
 
 @then('a backup file should be created in the backup directory')
@@ -223,7 +227,10 @@ def step_backup_created(context):
 def step_backups_exist(context):
     """Ensure backup directory has files"""
     if not list_backups():
-        save_to_backup(export_app_state())
+        path = save_to_backup(export_app_state())
+        if not hasattr(context, 'created_backups'):
+            context.created_backups = []
+        context.created_backups.append(path)
     context.backups = list_backups()
 
 
