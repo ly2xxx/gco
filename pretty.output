@@ -3,114 +3,114 @@ Feature: Data Loading # features/01_data_loading.feature:3
   I need to load data from various sources
   So that the dashboard displays accurate information
   Scenario: Load scores data                       # features/01_data_loading.feature:8
-    Given the data directory exists                # features/steps/data_layer_steps.py:26
-    When I load the scores data                    # features/steps/data_layer_steps.py:34
-    Then I should get a pandas DataFrame           # features/steps/data_layer_steps.py:41
-    And the DataFrame should have required columns # features/steps/data_layer_steps.py:47
+    Given the data directory exists                # features/steps/data_layer_steps.py:27
+    When I load the scores data                    # features/steps/data_layer_steps.py:35
+    Then I should get a pandas DataFrame           # features/steps/data_layer_steps.py:42
+    And the DataFrame should have required columns # features/steps/data_layer_steps.py:48
 
   Scenario: Load events data                   # features/01_data_loading.feature:14
-    Given the data directory exists            # features/steps/data_layer_steps.py:26
-    When I load the events data                # features/steps/data_layer_steps.py:55
-    Then events should be a list               # features/steps/data_layer_steps.py:62
-    And each event should have required fields # features/steps/data_layer_steps.py:68
+    Given the data directory exists            # features/steps/data_layer_steps.py:27
+    When I load the events data                # features/steps/data_layer_steps.py:56
+    Then events should be a list               # features/steps/data_layer_steps.py:63
+    And each event should have required fields # features/steps/data_layer_steps.py:69
 
   Scenario: Load announcements data                   # features/01_data_loading.feature:20
-    Given the data directory exists                   # features/steps/data_layer_steps.py:26
-    When I load the announcements data                # features/steps/data_layer_steps.py:77
-    Then announcements should be a list               # features/steps/data_layer_steps.py:84
-    And each announcement should have required fields # features/steps/data_layer_steps.py:90
+    Given the data directory exists                   # features/steps/data_layer_steps.py:27
+    When I load the announcements data                # features/steps/data_layer_steps.py:78
+    Then announcements should be a list               # features/steps/data_layer_steps.py:85
+    And each announcement should have required fields # features/steps/data_layer_steps.py:91
 
   Scenario: Load cup data                # features/01_data_loading.feature:26
-    Given the data directory exists      # features/steps/data_layer_steps.py:26
-    When I load the cup data             # features/steps/data_layer_steps.py:99
-    Then cup data should be a dictionary # features/steps/data_layer_steps.py:106
-    And cup data should have draw key    # features/steps/data_layer_steps.py:112
+    Given the data directory exists      # features/steps/data_layer_steps.py:27
+    When I load the cup data             # features/steps/data_layer_steps.py:100
+    Then cup data should be a dictionary # features/steps/data_layer_steps.py:107
+    And cup data should have draw key    # features/steps/data_layer_steps.py:113
 
   Scenario: Load outing data                 # features/01_data_loading.feature:32
-    Given the data directory exists          # features/steps/data_layer_steps.py:26
-    When I load the outing data              # features/steps/data_layer_steps.py:118
-    Then outing data should be a dictionary  # features/steps/data_layer_steps.py:125
-    And outing data should have red_team key # features/steps/data_layer_steps.py:131
+    Given the data directory exists          # features/steps/data_layer_steps.py:27
+    When I load the outing data              # features/steps/data_layer_steps.py:119
+    Then outing data should be a dictionary  # features/steps/data_layer_steps.py:126
+    And outing data should have red_team key # features/steps/data_layer_steps.py:132
 
 Feature: Data Export/Import # features/02_data_export_import.feature:3
   As an admin user
   I need to export and import application state
   So that I can backup and restore data
   Scenario: Export application state                       # features/02_data_export_import.feature:8
-    Given the data is loaded                               # features/steps/data_layer_steps.py:139
-    When I export the app state                            # features/steps/data_layer_steps.py:149
-    Then I should get a dictionary with all data sections  # features/steps/data_layer_steps.py:155
-    And the dictionary should have version and export_date # features/steps/data_layer_steps.py:163
+    Given the data is loaded                               # features/steps/data_layer_steps.py:140
+    When I export the app state                            # features/steps/data_layer_steps.py:150
+    Then I should get a dictionary with all data sections  # features/steps/data_layer_steps.py:156
+    And the dictionary should have version and export_date # features/steps/data_layer_steps.py:164
 
   Scenario: Import valid backup            # features/02_data_export_import.feature:14
-    Given I have a valid backup JSON       # features/steps/data_layer_steps.py:170
-    When I import the backup               # features/steps/data_layer_steps.py:184
-    Then all data sections should be saved # features/steps/data_layer_steps.py:195
+    Given I have a valid backup JSON       # features/steps/data_layer_steps.py:171
+    When I import the backup               # features/steps/data_layer_steps.py:185
+    Then all data sections should be saved # features/steps/data_layer_steps.py:196
 
   Scenario: Save backup to file                                  # features/02_data_export_import.feature:19
-    Given I have application state                               # features/steps/data_layer_steps.py:201
-    When I save to backup                                        # features/steps/data_layer_steps.py:207
-    Then a backup file should be created in the backup directory # features/steps/data_layer_steps.py:217
+    Given I have application state                               # features/steps/data_layer_steps.py:202
+    When I save to backup                                        # features/steps/data_layer_steps.py:208
+    Then a backup file should be created in the backup directory # features/steps/data_layer_steps.py:218
 
 Feature: Backup Management # features/03_backup_management.feature:3
   As a system admin
   I need to manage backup files
   So that I can restore previous states
   Scenario: List available backups                     # features/03_backup_management.feature:8
-    Given backup files exist in the backup directory   # features/steps/data_layer_steps.py:226
-    When I list the backups                            # features/steps/data_layer_steps.py:237
-    Then I should get a list of backups sorted by date # features/steps/data_layer_steps.py:243
+    Given backup files exist in the backup directory   # features/steps/data_layer_steps.py:227
+    When I list the backups                            # features/steps/data_layer_steps.py:238
+    Then I should get a list of backups sorted by date # features/steps/data_layer_steps.py:244
 
   Scenario: Compute diff between backup and current    # features/03_backup_management.feature:13
-    Given I have a backup and current state            # features/steps/data_layer_steps.py:249
-    When I compute the diff                            # features/steps/data_layer_steps.py:258
-    Then I should get a dictionary showing differences # features/steps/data_layer_steps.py:264
+    Given I have a backup and current state            # features/steps/data_layer_steps.py:250
+    When I compute the diff                            # features/steps/data_layer_steps.py:259
+    Then I should get a dictionary showing differences # features/steps/data_layer_steps.py:265
 
 Feature: Player Management # features/04_player_management.feature:3
   As a league administrator
   I need to manage player information
   So that the league operates correctly
   Scenario: Load player list     # features/04_player_management.feature:8
-    Given the club has players   # features/steps/data_layer_steps.py:272
-    When I load the player list  # features/steps/data_layer_steps.py:278
-    Then I should get 13 players # features/steps/data_layer_steps.py:284
+    Given the club has players   # features/steps/data_layer_steps.py:273
+    When I load the player list  # features/steps/data_layer_steps.py:279
+    Then I should get 13 players # features/steps/data_layer_steps.py:285
 
   Scenario: Verify team assignments      # features/04_player_management.feature:13
-    Given players are assigned to teams  # features/steps/data_layer_steps.py:290
-    When I check team assignments        # features/steps/data_layer_steps.py:297
-    Then Red Team should have 6 players  # features/steps/data_layer_steps.py:304
-    And Black Team should have 7 players # features/steps/data_layer_steps.py:310
+    Given players are assigned to teams  # features/steps/data_layer_steps.py:291
+    When I check team assignments        # features/steps/data_layer_steps.py:298
+    Then Red Team should have 6 players  # features/steps/data_layer_steps.py:305
+    And Black Team should have 7 players # features/steps/data_layer_steps.py:311
 
 Feature: Tournament Management # features/05_tournament_management.feature:3
   As a league administrator
   I need to manage tournament data
   So that tournament results are displayed correctly
   Scenario: Verify league tournaments exist      # features/05_tournament_management.feature:8
-    Given tournaments are defined                # features/steps/data_layer_steps.py:318
-    When I check league tournaments              # features/steps/data_layer_steps.py:324
-    Then there should be at least one tournament # features/steps/data_layer_steps.py:330
+    Given tournaments are defined                # features/steps/data_layer_steps.py:319
+    When I check league tournaments              # features/steps/data_layer_steps.py:325
+    Then there should be at least one tournament # features/steps/data_layer_steps.py:331
 
   Scenario: Verify outing matches exist   # features/05_tournament_management.feature:13
-    Given outing matches are defined      # features/steps/data_layer_steps.py:336
-    When I check outing matches           # features/steps/data_layer_steps.py:342
-    Then there should be 4 outing matches # features/steps/data_layer_steps.py:348
+    Given outing matches are defined      # features/steps/data_layer_steps.py:337
+    When I check outing matches           # features/steps/data_layer_steps.py:343
+    Then there should be 4 outing matches # features/steps/data_layer_steps.py:349
 
 Feature: Data Validation # features/06_data_validation.feature:3
   As a data integrity system
   I need to validate data structures
   So that the application doesn't crash on invalid data
   Scenario: Scores DataFrame structure                                                                                                               # features/06_data_validation.feature:8
-    Given scores data is loaded                                                                                                                      # features/steps/data_layer_steps.py:356
-    When I validate the DataFrame structure                                                                                                          # features/steps/data_layer_steps.py:362
-    Then it should have required columns: Player, Tournament, Game, Net_Score, Gross_Score, Birdies, Pars, Bogeys, Double_Bogeys, Eagles, Stableford # features/steps/data_layer_steps.py:368
+    Given scores data is loaded                                                                                                                      # features/steps/data_layer_steps.py:357
+    When I validate the DataFrame structure                                                                                                          # features/steps/data_layer_steps.py:363
+    Then it should have required columns: Player, Tournament, Game, Net_Score, Gross_Score, Birdies, Pars, Bogeys, Double_Bogeys, Eagles, Stableford # features/steps/data_layer_steps.py:369
 
   Scenario: Events have required fields            # features/06_data_validation.feature:13
-    Given events are loaded                        # features/steps/data_layer_steps.py:376
-    When I validate an event                       # features/steps/data_layer_steps.py:382
-    Then it should have: date, name, type, details # features/steps/data_layer_steps.py:391
+    Given events are loaded                        # features/steps/data_layer_steps.py:377
+    When I validate an event                       # features/steps/data_layer_steps.py:383
+    Then it should have: date, name, type, details # features/steps/data_layer_steps.py:392
 
   Scenario: Announcements have required fields                         # features/06_data_validation.feature:18
-    Given announcements are loaded                                     # features/steps/data_layer_steps.py:407
-    When I validate announcement structure                             # features/steps/data_layer_steps.py:413
-    Then announcement should have id, title, date, author, body fields # features/steps/data_layer_steps.py:399
+    Given announcements are loaded                                     # features/steps/data_layer_steps.py:408
+    When I validate announcement structure                             # features/steps/data_layer_steps.py:414
+    Then announcement should have id, title, date, author, body fields # features/steps/data_layer_steps.py:400
 
