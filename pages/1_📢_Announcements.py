@@ -95,3 +95,66 @@ if is_admin_user():
                     save_announcements(anns)
                     st.success("✅ 公告已发布！请刷新页面查看。")
                     st.balloons()
+
+    # ── Admin: edit / delete existing announcements ────────────────────────────
+    if anns:
+        with st.expander("✏️ 编辑/删除公告 / Edit or Delete Announcement", expanded=False):
+            ann_labels = [f"{a['date']} — {a['title']}" for a in anns]
+            sel_idx = st.selectbox(
+                "选择要编辑的公告 Select announcement to edit",
+                range(len(anns)),
+                format_func=lambda i: ann_labels[i],
+                key="edit_ann_select",
+            )
+            sel = anns[sel_idx]
+
+            with st.form("edit_ann_form"):
+                ec1, ec2 = st.columns([3, 1])
+                with ec1:
+                    edit_title = st.text_input("标题 Title *", value=sel["title"])
+                with ec2:
+                    edit_author = st.text_input("发布人 Author", value=sel.get("author", "组委会"))
+
+                edit_body = st.text_area("内容 Body *", value=sel["body"], height=200)
+
+                ec3, ec4, ec5 = st.columns([2, 2, 1])
+                with ec3:
+                    edit_date = st.date_input(
+                        "日期 Date",
+                        value=date.fromisoformat(sel["date"]),
+                    )
+                with ec4:
+                    edit_raw_tags = st.text_input(
+                        "标签 Tags (comma-separated)",
+                        value=", ".join(sel.get("tags", [])),
+                    )
+                with ec5:
+                    edit_pinned = st.checkbox("📌 置顶 Pin", value=sel.get("pinned", False))
+
+                save_col, del_col = st.columns(2)
+                with save_col:
+                    save_edit = st.form_submit_button("💾 保存修改 Save", width="stretch")
+                with del_col:
+                    delete_ann = st.form_submit_button("🗑️ 删除 Delete", width="stretch")
+
+            if save_edit:
+                if not edit_title.strip() or not edit_body.strip():
+                    st.error("请填写标题和内容！")
+                else:
+                    anns[sel_idx].update({
+                        "title": edit_title.strip(),
+                        "author": edit_author.strip() or "组委会",
+                        "body": edit_body.strip(),
+                        "date": str(edit_date),
+                        "tags": [t.strip() for t in edit_raw_tags.split(",") if t.strip()],
+                        "pinned": edit_pinned,
+                    })
+                    save_announcements(anns)
+                    st.success("✅ 公告已更新！")
+                    st.rerun()
+
+            if delete_ann:
+                anns.pop(sel_idx)
+                save_announcements(anns)
+                st.success("🗑️ 公告已删除！")
+                st.rerun()

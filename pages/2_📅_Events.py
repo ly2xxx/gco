@@ -103,3 +103,62 @@ if is_admin_user():
                     save_events(events)
                     st.success("✅ 赛事已添加！请刷新查看。")
                     st.rerun()
+
+    # ── Admin: edit / delete existing events ──────────────────────────────────
+    if events:
+        with st.expander("✏️ 编辑/删除赛事 / Edit or Delete Event", expanded=False):
+            ev_labels = [f"{e['date']} — {e['name']}" for e in events]
+            ev_sel_idx = st.selectbox(
+                "选择要编辑的赛事 Select event to edit",
+                range(len(events)),
+                format_func=lambda i: ev_labels[i],
+                key="edit_ev_select",
+            )
+            sel_ev = events[ev_sel_idx]
+
+            EVENT_TYPES = ["League", "Cup", "Outing", "Grand Final"]
+
+            with st.form("edit_event_form"):
+                ec1, ec2 = st.columns(2)
+                with ec1:
+                    edit_ev_name = st.text_input("赛事名称 Name *", value=sel_ev["name"])
+                    edit_ev_date = st.date_input(
+                        "日期 Date",
+                        value=date.fromisoformat(sel_ev["date"]),
+                    )
+                with ec2:
+                    edit_ev_type = st.selectbox(
+                        "类型 Type",
+                        EVENT_TYPES,
+                        index=EVENT_TYPES.index(sel_ev["type"]) if sel_ev["type"] in EVENT_TYPES else 0,
+                    )
+                    edit_ev_details = st.text_input(
+                        "详情 Details",
+                        value=sel_ev.get("details", ""),
+                    )
+
+                save_ev_col, del_ev_col = st.columns(2)
+                with save_ev_col:
+                    save_ev = st.form_submit_button("💾 保存修改 Save", width="stretch")
+                with del_ev_col:
+                    delete_ev = st.form_submit_button("🗑️ 删除 Delete", width="stretch")
+
+            if save_ev:
+                if not edit_ev_name.strip():
+                    st.error("请填写赛事名称！")
+                else:
+                    events[ev_sel_idx].update({
+                        "date": str(edit_ev_date),
+                        "name": edit_ev_name.strip(),
+                        "type": edit_ev_type,
+                        "details": edit_ev_details.strip(),
+                    })
+                    save_events(events)
+                    st.success("✅ 赛事已更新！")
+                    st.rerun()
+
+            if delete_ev:
+                events.pop(ev_sel_idx)
+                save_events(events)
+                st.success("🗑️ 赛事已删除！")
+                st.rerun()
