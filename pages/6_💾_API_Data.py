@@ -14,7 +14,8 @@ from data import (
     load_announcements, save_announcements,
     load_cup, save_cup,
     load_outing, save_outing,
-    save_to_backup, list_backups, compute_diff
+    save_to_backup, list_backups, compute_diff,
+    BACKUP_DIR,
 )
 
 st.set_page_config(page_title="GCO | Data API", page_icon="💾", layout="wide")
@@ -66,21 +67,44 @@ with c1:
 
 with c2:
     section(st, "📤", "Import Data (Upload JSON)")
-    st.warning("Uploading a state JSON will OVERWRITE all existing local data files (Events, Cup, Scores, etc.).")
+    st.info("Upload a previously exported JSON backup. It will be saved to the `backup/` folder — you can then choose whether to restore it below.")
     uploaded_file = st.file_uploader("Upload GCO Data Backup", type=["json"])
-    
+
     if uploaded_file is not None:
         try:
             uploaded_state = json.load(uploaded_file)
-            if "export_date" in uploaded_state:
-                st.success(f"Valid backup found from: {uploaded_state['export_date']}")
-                
-                if st.button("🚨 CONFIRM OVERWRITE STATE", type="primary"):
-                    import_app_state(uploaded_state)
-                    st.success("App state successfully overwritten! Please refresh the application.")
-                    st.balloons()
-            else:
+            if "export_date" not in uploaded_state:
                 st.error("Invalid JSON format. Missing version/export_date metadata.")
+            else:
+                # Derive destination filename from the uploaded file's original name
+                # (preserves timestamp if it was exported from this app), otherwise
+                # fall back to the export_date embedded in the JSON.
+                import re as _re
+                orig_name = uploaded_file.name
+                if _re.match(r"gco_backup_\d{8}_\d{6}\.json", orig_name):
+                    dest_name = orig_name
+                else:
+                    # Build a name from export_date: "2026-04-03T21:41:42.123456" → "20260403_214142"
+                    ts_str = uploaded_state["export_date"].replace("-", "").replace(":", "").replace("T", "_")[:15]
+                    dest_name = f"gco_backup_{ts_str}.json"
+
+                dest_path = BACKUP_DIR / dest_name
+
+                # Only write once per uploaded file (session_state guard prevents
+                # re-writing on every Streamlit re-run while the file is still
+                # sitting in the uploader widget).
+                already_saved = st.session_state.get("_last_uploaded_backup") == dest_name
+                if not already_saved:
+                    dest_path.write_text(
+                        json.dumps(uploaded_state, ensure_ascii=False, indent=2),
+                        encoding="utf-8",
+                    )
+                    st.session_state["_last_uploaded_backup"] = dest_name
+
+                st.success(
+                    f"✅ Saved as **{dest_name}** (from {uploaded_state['export_date']}). "
+                    "Use **♻️ Restore from Backup** below to apply it."
+                )
         except json.JSONDecodeError:
             st.error("Could not parse JSON file. Please ensure it is correctly formatted.")
         except Exception as e:
