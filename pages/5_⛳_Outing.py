@@ -108,9 +108,17 @@ for m in matches:
             """, unsafe_allow_html=True)
             
     if is_admin_user():
-        with st.expander(f"⚙️ 更新 {m['name']} 赛果"):
+        with st.expander(f"⚙️ 编辑/更新 {m['name']}"):
             with st.form(f"outing_form_{m['id']}"):
-                st.write(f"录入 **{m['name']}** 的得分")
+                st.markdown("**📝 比赛信息 Match Info**")
+                new_name = st.text_input("比赛标题 Title", value=m["name"], key=f"name_{m['id']}")
+                col_meta1, col_meta2 = st.columns(2)
+                with col_meta1:
+                    new_date = st.text_input("🗓 日期 Date (YYYY-MM-DD)", value=m["date"], key=f"date_{m['id']}")
+                with col_meta2:
+                    new_venue = st.text_input("📍 场地 Venue", value=m["venue"], key=f"venue_{m['id']}")
+
+                st.markdown("**📊 赛果 Scores**")
                 col_in1, col_in2, col_in3 = st.columns(3)
                 with col_in1:
                     new_red = st.number_input("🔴 红队得分", min_value=0.0, max_value=2.0, step=0.5, value=float(m["red_score"] or 0))
@@ -118,12 +126,15 @@ for m in matches:
                     new_black = st.number_input("⚫ 黑队得分", min_value=0.0, max_value=2.0, step=0.5, value=float(m["black_score"] or 0))
                 with col_in3:
                     new_status = st.selectbox("状态 Status", ["upcoming", "completed"], index=1 if is_done else 0)
-                
+
                 if st.form_submit_button("✅ 保存更新 Update"):
+                    m["name"] = new_name.strip() or m["name"]
+                    m["date"] = new_date.strip() or m["date"]
+                    m["venue"] = new_venue.strip() or m["venue"]
                     m["red_score"] = new_red
                     m["black_score"] = new_black
                     m["status"] = new_status
                     save_outing(outing_data)
-                    st.success("比赛结果已更新！")
+                    st.success("比赛信息及赛果已更新！Match updated successfully!")
                     st.rerun()
     st.markdown("---")
