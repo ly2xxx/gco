@@ -15,6 +15,8 @@ from data import (
     load_cup, save_cup,
     load_outing, save_outing,
     save_to_backup, list_backups, compute_diff,
+    export_app_state, import_app_state,
+    github_push_state, github_load_state,
     BACKUP_DIR,
 )
 
@@ -26,28 +28,6 @@ if not is_admin_user():
     st.stop()
 
 hero(st, "💾 Data API & Management", "Export and Import Application Data", "GCO 2026 Admin")
-
-# Aggregate all data into a single state payload
-def export_app_state() -> dict:
-    return {
-        "version": "1.0",
-        "export_date": datetime.now().isoformat(),
-        "events": load_events(),
-        "announcements": load_announcements(),
-        "cup": load_cup(),
-        "outing": load_outing(),
-        "scores": load_scores().to_dict(orient="records"),
-    }
-
-def import_app_state(state: dict):
-    if "events" in state: save_events(state["events"])
-    if "announcements" in state: save_announcements(state["announcements"])
-    if "cup" in state: save_cup(state["cup"])
-    if "outing" in state: save_outing(state["outing"])
-    if "scores" in state:
-        import pandas as pd
-        df = pd.DataFrame(state["scores"])
-        save_scores(df)
 
 state_data = export_app_state()
 json_string = json.dumps(state_data, ensure_ascii=False, indent=2)
@@ -113,6 +93,48 @@ with c2:
 st.markdown("---")
 section(st, "🧑‍💻", "Raw JSON Developer Preview")
 st.json(state_data, expanded=False)
+
+# ── GitHub Sync Status ──────────────────────────────────────────────────────
+st.markdown("---")
+section(st, "🐙", "GitHub Persistence")
+
+try:
+    import streamlit as _st
+    _token = _st.secrets.get("GITHUB_TOKEN", "")
+    _repo  = _st.secrets.get("GITHUB_REPO", "")
+    _path  = _st.secrets.get("GITHUB_DATA_PATH", "gco_state.json")
+except Exception:
+    _token, _repo, _path = "", "", "gco_state.json"
+
+if not _token or not _repo:
+    st.warning(
+        "⚠️ **GitHub sync is not configured.** "
+        "Add `GITHUB_TOKEN`, `GITHUB_REPO` (and optionally `GITHUB_DATA_PATH`) "
+        "to `.streamlit/secrets.toml` locally and to **Streamlit Cloud → App settings → Secrets**."
+    )
+else:
+    st.success(
+        f"✅ GitHub sync is **active** — repo: `{_repo}`, file: `{_path}`"
+    )
+    # Show what’s currently saved in GitHub vs current state
+    gh_col, push_col = st.columns([3, 1])
+    with gh_col:
+        with st.expander("🔍 View state currently saved in GitHub"):
+            gh_state = github_load_state()
+            if gh_state:
+                st.caption(f"Last saved: {gh_state.get('export_date', 'unknown')}")
+                st.json(gh_state, expanded=False)
+            else:
+                st.info("No state file found in GitHub yet — it will be created on the next save.")
+    with push_col:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🚀 Push to GitHub Now", help="Immediately sync current app state to GitHub"):
+            with st.spinner("Pushing to GitHub…"):
+                ok = github_push_state(state_data)
+            if ok:
+                st.success("✅ Pushed successfully!")
+            else:
+                st.error("❌ Push failed — check token/repo in secrets.")
 
 # ── Restore from Backup ───────────────────────────────────────────────────────
 st.markdown("---")

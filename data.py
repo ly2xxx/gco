@@ -6,7 +6,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 from datetime import date, datetime
-import json, os, pathlib
+import json, os, pathlib, base64, urllib.request, urllib.error
 
 # ── root data directory ──────────────────────────────────────────────────────
 ROOT = pathlib.Path(__file__).parent
@@ -31,6 +31,121 @@ def save_to_backup(state_data: dict) -> str:
     path = BACKUP_DIR / f"gco_backup_{ts}.json"
     path.write_text(json.dumps(state_data, ensure_ascii=False, indent=2), encoding="utf-8")
     return str(path)
+
+# ── GitHub persistence helpers ────────────────────────────────────────────────
+# Stores the entire app state as a single JSON file in the GitHub repo.
+# Requires these keys in .streamlit/secrets.toml (and Streamlit Cloud secrets):
+#   GITHUB_TOKEN     – Personal Access Token with repo (contents:write) scope
+#   GITHUB_REPO      – "owner/repo-name" e.g. "alice/gco"
+#   GITHUB_DATA_PATH – path inside repo, default "gco_state.json"
+
+def _gh_headers() -> dict | None:
+    """Return GitHub API auth headers, or None if secrets are not configured."""
+    try:
+        import streamlit as st
+        token = st.secrets.get("GITHUB_TOKEN", "")
+        if not token:
+            return None
+        return {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        }
+    except Exception:
+        return None
+
+def _gh_api_url() -> str | None:
+    """Return the GitHub Contents API URL for the state file, or None."""
+    try:
+        import streamlit as st
+        repo = st.secrets.get("GITHUB_REPO", "")
+        path = st.secrets.get("GITHUB_DATA_PATH", "gco_state.json")
+        if not repo:
+            return None
+        return f"https://api.github.com/repos/{repo}/contents/{path}"
+    except Exception:
+        return None
+
+def github_load_state() -> dict | None:
+    """Fetch persisted app state from GitHub. Returns None if unavailable."""
+    headers = _gh_headers()
+    url = _gh_api_url()
+    if not headers or not url:
+        return None
+    try:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            payload = json.loads(resp.read())
+            content = base64.b64decode(payload["content"]).decode("utf-8")
+            return json.loads(content)
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return None  # File not yet created in repo – first push will create it
+        return None
+    except Exception:
+        return None
+
+def github_push_state(state: dict) -> bool:
+    """Push the full app state dict to GitHub. Returns True on success."""
+    headers = _gh_headers()
+    url = _gh_api_url()
+    if not headers or not url:
+        return False
+    try:
+        # Fetch the current file SHA so GitHub accepts the update.
+        current_sha: str | None = None
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as resp:
+                current_sha = json.loads(resp.read()).get("sha")
+        except urllib.error.HTTPError as e:
+            if e.code != 404:
+                return False  # Unexpected error – bail out
+
+        content_b64 = base64.b64encode(
+            json.dumps(state, ensure_ascii=False, indent=2).encode("utf-8")
+        ).decode("ascii")
+
+        payload: dict = {
+            "message": f"chore: auto-save GCO state [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC]",
+            "content": content_b64,
+        }
+        if current_sha:
+            payload["sha"] = current_sha
+
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers, method="PUT")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status in (200, 201)
+    except Exception:
+        return False
+
+def _sync_github_to_local(gh_state: dict) -> None:
+    """Write the GitHub state dict to local data/ files (only when missing)."""
+    def _missing(fname: str) -> bool:
+        return not (DATA_DIR / fname).exists()
+
+    if _missing("scores.csv") and "scores" in gh_state:
+        pd.DataFrame(gh_state["scores"]).to_csv(DATA_DIR / "scores.csv", index=False)
+    if _missing("announcements.json") and "announcements" in gh_state:
+        (DATA_DIR / "announcements.json").write_text(
+            json.dumps(gh_state["announcements"], ensure_ascii=False, indent=2), encoding="utf-8")
+    if _missing("events.json") and "events" in gh_state:
+        (DATA_DIR / "events.json").write_text(
+            json.dumps(gh_state["events"], ensure_ascii=False, indent=2), encoding="utf-8")
+    if _missing("cup.json") and "cup" in gh_state:
+        (DATA_DIR / "cup.json").write_text(
+            json.dumps(gh_state["cup"], ensure_ascii=False, indent=2), encoding="utf-8")
+    if _missing("outing.json") and "outing" in gh_state:
+        (DATA_DIR / "outing.json").write_text(
+            json.dumps(gh_state["outing"], ensure_ascii=False, indent=2), encoding="utf-8")
+
+# ── Startup hydration ──────────────────────────────────────────────────────────
+# Priority: GitHub (authoritative) → local backup/ → defaults
+_GH_STATE = github_load_state()
+if _GH_STATE:
+    _sync_github_to_local(_GH_STATE)
 
 # Initialize global fallback state from latest backup if available
 _GLOBAL_BACKUP, _LATEST_BACKUP_PATH = _load_latest_backup()
@@ -171,6 +286,7 @@ def load_events() -> list[dict]:
 
 def save_events(events: list[dict]) -> None:
     EVENTS_FILE.write_text(json.dumps(events, ensure_ascii=False, indent=2), encoding="utf-8")
+    _schedule_github_push()
 
 # ── Announcements ─────────────────────────────────────────────────────────────
 ANNOUNCEMENTS_FILE = DATA_DIR / "announcements.json"
@@ -212,6 +328,7 @@ def load_announcements() -> list[dict]:
 
 def save_announcements(anns: list[dict]) -> None:
     ANNOUNCEMENTS_FILE.write_text(json.dumps(anns, ensure_ascii=False, indent=2), encoding="utf-8")
+    _schedule_github_push()
 
 # ── League score data ─────────────────────────────────────────────────────────
 SCORES_FILE = DATA_DIR / "scores.csv"
@@ -1251,6 +1368,7 @@ def load_scores() -> pd.DataFrame:
 
 def save_scores(df: pd.DataFrame) -> None:
     df.to_csv(SCORES_FILE, index=False)
+    _schedule_github_push()
 
 # ── Cup bracket data ──────────────────────────────────────────────────────────
 CUP_FILE = DATA_DIR / "cup.json"
@@ -1319,6 +1437,7 @@ def load_cup() -> dict:
 
 def save_cup(cup: dict) -> None:
     CUP_FILE.write_text(json.dumps(cup, ensure_ascii=False, indent=2), encoding="utf-8")
+    _schedule_github_push()
 
 # ── Outing Match data (Red vs Black) ──────────────────────────────────────────
 OUTING_FILE = DATA_DIR / "outing.json"
@@ -1392,6 +1511,7 @@ def load_outing() -> dict:
 
 def save_outing(outing: dict) -> None:
     OUTING_FILE.write_text(json.dumps(outing, ensure_ascii=False, indent=2), encoding="utf-8")
+    _schedule_github_push()
 
 # ── State Export/Import ────────────────────────────────────────────────────────────
 def export_app_state() -> dict:
@@ -1405,6 +1525,19 @@ def export_app_state() -> dict:
         "outing": load_outing(),
         "scores": load_scores().to_dict(orient="records"),
     }
+
+def _schedule_github_push() -> None:
+    """Push the full app state to GitHub in a background thread.
+
+    Running in a daemon thread means the Streamlit response is returned
+    immediately — the GitHub API call (~200 ms) does not block the user.
+    """
+    import threading
+    def _push():
+        state = export_app_state()
+        github_push_state(state)
+    t = threading.Thread(target=_push, daemon=True)
+    t.start()
 
 def import_app_state(state: dict) -> None:
     """Import application state from a dictionary."""
