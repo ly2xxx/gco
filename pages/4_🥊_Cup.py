@@ -148,20 +148,25 @@ if is_admin_user():
         with tab:
             matches = rounds.get(rk, [])
             if matches:
-                with st.form(f"form_{rk}"):
-                    match_options = [m["match"] for m in matches if not m.get("winner")]
-                    if not match_options:
-                        st.success("✅ 本轮所有比赛结果已录入。")
-                    else:
-                        chosen_match = st.selectbox("选择对阵", match_options)
-                        m_obj = next(m for m in matches if m["match"] == chosen_match)
-                        slots2 = chosen_match.split(" vs ")
-                        p1n = draw.get(slots2[0], slots2[0])
-                        p2n = draw.get(slots2[1], slots2[1]) if len(slots2) > 1 else "TBD"
-                        winner_choice = st.radio("胜者 Winner", [p1n, p2n], horizontal=True)
+                match_options = [m["match"] for m in matches if not m.get("winner")]
+                if not match_options:
+                    st.success("✅ 本轮所有比赛结果已录入。")
+                else:
+                    chosen_match = st.selectbox("选择对阵", match_options, key=f"sel_m_{rk}")
+                    m_obj = next(m for m in matches if m["match"] == chosen_match)
+                    slots2 = chosen_match.split(" vs ")
+                    p1n = draw.get(slots2[0], slots2[0])
+                    p2n = draw.get(slots2[1], slots2[1]) if len(slots2) > 1 else "TBD"
+                    
+                    with st.form(f"form_{rk}"):
+                        winner_opts = [p1n, p2n] if len(slots2) > 1 else [p1n]
+                        winner_choice = st.radio("胜者 Winner", winner_opts, horizontal=True)
                         score_input = st.text_input("比分 Score (e.g. 3&2)", "")
                         if st.form_submit_button("💾 保存 Save"):
-                            winner_slot_save = slots2[0] if winner_choice == p1n else slots2[1]
+                            if len(slots2) > 1:
+                                winner_slot_save = slots2[0] if winner_choice == p1n else slots2[1]
+                            else:
+                                winner_slot_save = slots2[0]
                             m_obj["winner"] = winner_slot_save
                             m_obj["score"] = score_input.strip()
                             save_cup(cup)
