@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-04-18T20:59:07.572600",
+  "export_date": "2026-04-19T22:50:47.708572",
   "events": [
     {
       "date": "2026-04-04",
@@ -182,7 +182,21 @@
         "venue": "Kilmacolm",
         "red_score": 0.0,
         "black_score": 0.0,
-        "status": "upcoming"
+        "status": "upcoming",
+        "red_players": [
+          "李扬",
+          "赵鲲",
+          "张纬",
+          "Justin",
+          "曾诚"
+        ],
+        "black_players": [
+          "Jacky",
+          "杨明",
+          "王文龙",
+          "徐峥",
+          "Neo"
+        ]
       },
       {
         "id": "om2",
