@@ -89,6 +89,17 @@ for m in matches:
     with col1:
         st.markdown(f"#### {m['name']}")
         st.caption(f"🗓 日期 Date: {m['date']}　📍 场地 Venue: {m['venue']}")
+        
+        # Display participating players
+        r_players = m.get("red_players", [])
+        b_players = m.get("black_players", [])
+        if r_players or b_players:
+            p_cols = st.columns(2)
+            with p_cols[0]:
+                st.markdown(f"<span style='color:var(--red-team); font-size:0.85rem'>🔴 {' • '.join(r_players) if r_players else 'TBD'}</span>", unsafe_allow_html=True)
+            with p_cols[1]:
+                st.markdown(f"<span style='color:#aaa; font-size:0.85rem'>⚫ {' • '.join(b_players) if b_players else 'TBD'}</span>", unsafe_allow_html=True)
+
     with col2:
         if is_done:
             r_pts = float(m["red_score"] or 0)
@@ -118,6 +129,25 @@ for m in matches:
                 with col_meta2:
                     new_venue = st.text_input("📍 场地 Venue", value=m["venue"], key=f"venue_{m['id']}")
 
+                st.markdown("**👥 参赛名单 Lineups (Max 4 per team)**")
+                col_p1, col_p2 = st.columns(2)
+                with col_p1:
+                    new_red_players = st.multiselect(
+                        "🔴 红队选手", 
+                        options=red_t, 
+                        default=m.get("red_players", []),
+                        max_selections=9,
+                        key=f"red_p_{m['id']}"
+                    )
+                with col_p2:
+                    new_black_players = st.multiselect(
+                        "⚫ 黑队选手", 
+                        options=black_t, 
+                        default=m.get("black_players", []),
+                        max_selections=9,
+                        key=f"black_p_{m['id']}"
+                    )
+
                 st.markdown("**📊 赛果 Scores**")
                 col_in1, col_in2, col_in3 = st.columns(3)
                 with col_in1:
@@ -133,6 +163,8 @@ for m in matches:
                     m["venue"] = new_venue.strip() or m["venue"]
                     m["red_score"] = new_red
                     m["black_score"] = new_black
+                    m["red_players"] = new_red_players
+                    m["black_players"] = new_black_players
                     m["status"] = new_status
                     save_outing(outing_data)
                     st.success("比赛信息及赛果已更新！Match updated successfully!")
