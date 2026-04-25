@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-04-25T19:11:34.166387",
+  "export_date": "2026-04-25T19:13:15.646963",
   "events": [
     {
       "date": "2026-04-04",
@@ -294,22 +294,6 @@
     },
     {
       "Player": "Neo",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 1",
-      "Game_No": 1,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN
-    },
-    {
-      "Player": "徐峥",
       "Tournament": "2026个人联赛",
       "Game": "Game 1",
       "Game_No": 1,
@@ -1394,6 +1378,22 @@
       "Eagles": 0,
       "Stableford": 0,
       "Date": "2026-04-25",
+      "Venue": "Prestwick St.Nicolas"
+    },
+    {
+      "Player": "徐峥",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 1",
+      "Game_No": 1,
+      "Net_Score": 4,
+      "Gross_Score": 97,
+      "Birdies": 0,
+      "Pars": 3,
+      "Bogeys": 6,
+      "Double_Bogeys": 9,
+      "Eagles": 0,
+      "Stableford": 0,
+      "Date": "2026-04-19",
       "Venue": "Prestwick St.Nicolas"
     }
   ]
