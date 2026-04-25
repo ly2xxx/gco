@@ -60,7 +60,7 @@ st.dataframe(
 
 # ── OOM bar chart ─────────────────────────────────────────────────────────────
 fig_oom = px.bar(
-    oom.head(12),
+    oom,
     x="Player",
     y="Total_Net",
     color="Total_Net",
