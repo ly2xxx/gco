@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-04-25T14:41:37.356777",
+  "export_date": "2026-04-25T14:45:07.394009",
   "events": [
     {
       "date": "2026-04-04",
@@ -1387,7 +1387,7 @@
       "Tournament": "2026个人联赛",
       "Game": "Game 1",
       "Game_No": 1,
-      "Net_Score": 73,
+      "Net_Score": -8,
       "Gross_Score": 95,
       "Birdies": 0,
       "Pars": 1,
