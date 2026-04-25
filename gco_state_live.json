@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-04-25T14:45:21.287712",
+  "export_date": "2026-04-25T14:48:00.163037",
   "events": [
     {
       "date": "2026-04-04",
@@ -185,14 +185,12 @@
         "status": "upcoming",
         "red_players": [
           "李扬",
-          "赵鲲",
           "张纬",
           "Justin",
           "曾诚"
         ],
         "black_players": [
           "Jacky",
-          "杨明",
           "王文龙",
           "徐峥",
           "Neo"
