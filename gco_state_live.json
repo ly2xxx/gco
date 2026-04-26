@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-04-25T19:13:31.547277",
+  "export_date": "2026-04-26T19:48:14.761281",
   "events": [
     {
       "date": "2026-04-04",
@@ -180,9 +180,9 @@
         "name": "Outing Day 1: 4-men scramble",
         "date": "2026-04-26",
         "venue": "Kilmacolm",
-        "red_score": 0.0,
+        "red_score": 2.0,
         "black_score": 0.0,
-        "status": "upcoming",
+        "status": "completed",
         "red_players": [
           "李扬",
           "张纬",
