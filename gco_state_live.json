@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-04-28T19:35:14.811214",
+  "export_date": "2026-04-28T19:44:34.659673",
   "events": [
     {
       "date": "2026-04-04",
@@ -143,7 +143,32 @@
           "score": "5&4"
         }
       ],
-      "R2": [],
+      "R2": [
+        {
+          "match": "P1 vs P4",
+          "home": "P4",
+          "winner": null,
+          "score": ""
+        },
+        {
+          "match": "P2 vs P5",
+          "home": "P5",
+          "winner": null,
+          "score": ""
+        },
+        {
+          "match": "P7 vs P10",
+          "home": "P10",
+          "winner": null,
+          "score": ""
+        },
+        {
+          "match": "P8 vs P11",
+          "home": "P11",
+          "winner": null,
+          "score": ""
+        }
+      ],
       "SF": [],
       "F": []
     },
