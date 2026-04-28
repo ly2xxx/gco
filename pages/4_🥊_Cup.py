@@ -116,6 +116,13 @@ for col_idx, (rk, rl) in enumerate(ROUND_LABELS.items()):
                 p1_name = draw.get(p1_slot, "TBD") if p1_slot else "BYE"
                 p2_name = draw.get(p2_slot, "TBD") if p2_slot else "BYE"
                 
+                home_slot = m.get("home")
+                if home_slot:
+                    if home_slot == p1_slot:
+                        p1_name += " *"
+                    elif home_slot == p2_slot:
+                        p2_name += " *"
+                
                 winner = m.get("winner")
                 score = m.get("score", "")
 
@@ -125,7 +132,7 @@ for col_idx, (rk, rl) in enumerate(ROUND_LABELS.items()):
                 score_html_1 = f"<div class='brkt-score'>{score} FINAL</div>" if p1_class and score else ""
                 score_html_2 = f"<div class='brkt-score'>{score} FINAL</div>" if p2_class and score else ""
 
-                m_html = f"""<div class="brkt-col" style="margin-top:{idx * (col_idx * 30)}px">
+                m_html = f"""<div class="brkt-col">
   <div class="brkt-match">
     <div class="brkt-header">Match {idx+1}</div>
     <div class="brkt-player-row {p1_class}">
