@@ -93,6 +93,7 @@ fig_oom.update_layout(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(30,61,44,.4)",
     coloraxis_showscale=False,
     xaxis=dict(tickfont=dict(size=11)),
+    xaxis_title=None,
 )
 st.plotly_chart(fig_oom, width='stretch')
 
