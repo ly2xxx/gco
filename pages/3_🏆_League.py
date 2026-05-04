@@ -17,11 +17,14 @@ hero(st, "🏆 个人联赛", "Individual League Standings", "GCO 2026")
 
 df = load_scores()
 
+# ── Filter for played rounds ─────────────────────────────────────────────────
+df_played = df[df["Gross_Score"] > 0].copy()
+
 # ── Overall Order-of-Merit (OOM) ──────────────────────────────────────────────
 section(st, "📊", "积分榜 Order of Merit")
 
 oom = (
-    df.groupby("Player")
+    df_played.groupby("Player")
     .agg(
         Total_Net=("Net_Score", "sum"),
         Games=("Game", "count"),
@@ -34,16 +37,32 @@ oom = (
     )
     .reset_index()
 )
-oom = oom.sort_values(["Total_Net", "Eagles", "Birdies"], ascending=[True, False, False])
+oom = (
+    oom.set_index("Player")
+    .reindex(PLAYERS)
+    .fillna(0)
+    .reset_index()
+)
+
+# Sorting: played rounds first, then by score. 0-round players go to the bottom.
+oom["Has_Played"] = oom["Games"] > 0
+oom = oom.sort_values(
+    ["Has_Played", "Total_Net", "Eagles", "Birdies"], 
+    ascending=[False, True, False, False]
+).drop(columns=["Has_Played"])
+
 oom.insert(0, "Rank", range(1, len(oom) + 1))
-oom["Avg_Net"] = (oom["Total_Net"] / oom["Games"]).round(2)
+oom["Avg_Net"] = (oom["Total_Net"] / oom["Games"]).fillna(0).round(2)
 oom["Avg_Stableford"] = oom["Avg_Stableford"].round(1)
 
-# rank medals
-def rank_icon(r):
+# rank medals (only for those who have played)
+def rank_icon(row):
+    r = row["Rank"]
+    if row["Games"] == 0:
+        return "-"
     return {1: "🥇", 2: "🥈", 3: "🥉"}.get(r, str(r))
 
-oom["Rank"] = oom["Rank"].apply(rank_icon)
+oom["Rank"] = oom.apply(rank_icon, axis=1)
 
 display_cols = ["Rank", "Player", "Games", "Total_Net", "Avg_Net",
                 "Eagles", "Birdies", "Pars", "Bogeys", "DBogeys"]
@@ -84,7 +103,7 @@ tabs = st.tabs(list(LEAGUE_TOURNAMENTS.keys()))
 
 for tab, (t_name, t_info) in zip(tabs, LEAGUE_TOURNAMENTS.items()):
     with tab:
-        t_df = df[df["Tournament"] == t_name]
+        t_df = df_played[df_played["Tournament"] == t_name]
         if t_df.empty:
             st.info("暂无数据")
             continue
@@ -100,7 +119,21 @@ for tab, (t_name, t_info) in zip(tabs, LEAGUE_TOURNAMENTS.items()):
             .reset_index()
             .sort_values(["Total_Net", "Eagles", "Birdies"], ascending=[True, False, False])
         )
-        lb.insert(0, "Rank", [rank_icon(i) for i in range(1, len(lb) + 1)])
+        
+        # Ensure all players are listed in tournament leaderboards too
+        lb = (
+            lb.set_index("Player")
+            .reindex(PLAYERS)
+            .fillna(0)
+            .reset_index()
+        )
+        lb["Has_Played"] = lb["Games"] > 0
+        lb = lb.sort_values(
+            ["Has_Played", "Total_Net", "Eagles", "Birdies"], 
+            ascending=[False, True, False, False]
+        ).drop(columns=["Has_Played"])
+
+        lb.insert(0, "Rank", [rank_icon({"Rank": i, "Games": g}) for i, g in zip(range(1, len(lb) + 1), lb["Games"])])
         lb["Period"] = t_info["period"]
 
         st.caption(f"📅 赛期：{t_info['period']}")
@@ -124,7 +157,7 @@ for tab, (t_name, t_info) in zip(tabs, LEAGUE_TOURNAMENTS.items()):
 section(st, "👤", "球员详情 Player Deep-Dive")
 
 selected = st.selectbox("选择球员", PLAYERS)
-p_df = df[df["Player"] == selected].copy().sort_values("Game_No")
+p_df = df_played[df_played["Player"] == selected].copy().sort_values("Game_No")
 
 if not p_df.empty:
     c1, c2, c3, c4 = st.columns(4)
