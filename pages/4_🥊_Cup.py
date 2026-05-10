@@ -7,7 +7,7 @@ import datetime
 
 import streamlit as st
 from theme import inject_theme, hero, section
-from data import load_cup, save_cup, PLAYERS
+from data import load_cup, save_cup, PLAYERS, github_upload_image
 from auth import is_admin_user
 
 st.set_page_config(page_title="GCO | 个人杯赛", page_icon="🥊", layout="wide")
@@ -169,6 +169,10 @@ if is_admin_user():
                         winner_opts = [p1n, p2n] if len(slots2) > 1 else [p1n]
                         winner_choice = st.radio("胜者 Winner", winner_opts, horizontal=True)
                         score_input = st.text_input("比分 Score (e.g. 3&2)", "")
+                        
+                        st.write("可选：上传计分卡 Optional: Upload Scorecard")
+                        scorecard_pic = st.file_uploader("支持格式 / Supported formats: JPG, PNG", type=["jpg", "jpeg", "png"], key=f"file_{rk}")
+                        
                         if st.form_submit_button("💾 保存 Save"):
                             if len(slots2) > 1:
                                 winner_slot_save = slots2[0] if winner_choice == p1n else slots2[1]
@@ -177,6 +181,17 @@ if is_admin_user():
                             m_obj["winner"] = winner_slot_save
                             m_obj["score"] = score_input.strip()
                             save_cup(cup)
+                            
+                            if scorecard_pic is not None:
+                                p2_slot_name = slots2[1] if len(slots2) > 1 else 'BYE'
+                                filename = f"cup_{rk}_{slots2[0]}_vs_{p2_slot_name}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.{scorecard_pic.name.split('.')[-1]}"
+                                filename = filename.replace(" ", "_").replace("/", "_")
+                                success = github_upload_image(scorecard_pic.getvalue(), filename)
+                                if success:
+                                    st.success(f"🖼️ 计分卡已成功上传。 Scorecard uploaded.")
+                                else:
+                                    st.warning(f"⚠️ 成绩已保存，但计分卡上传失败。 Scorecard upload failed.")
+
                             st.success(f"✅ 已记录：{winner_choice} 获胜！")
                             st.rerun()
 

@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from theme import inject_theme, hero, section
-from data import load_scores, save_scores, LEAGUE_TOURNAMENTS, PLAYERS
+from data import load_scores, save_scores, LEAGUE_TOURNAMENTS, PLAYERS, github_upload_image
 from auth import is_admin_user
 from datetime import date, datetime
 
@@ -262,6 +262,9 @@ if is_admin_user():
             in_par = bc3.number_input("标准 Par", min_value=0, value=int(rec.get("Pars", 0)))
             in_bg = bc4.number_input("柏忌 Bogey", min_value=0, value=int(rec.get("Bogeys", 0)))
             in_dbg = bc5.number_input("双柏忌+ D.Bogey+", min_value=0, value=int(rec.get("Double_Bogeys", 0)))
+            
+            st.write("可选：上传计分卡 Optional: Upload Scorecard")
+            scorecard_pic = st.file_uploader("支持格式 / Supported formats: JPG, PNG", type=["jpg", "jpeg", "png"])
 
             if st.form_submit_button("✅ 保存成绩 Save", width='stretch'):
                 total_holes = in_eg + in_bd + in_par + in_bg + in_dbg
@@ -294,6 +297,17 @@ if is_admin_user():
                     }])
                     df = pd.concat([df, new_row], ignore_index=True)
                     save_scores(df)
+                    
+                    if scorecard_pic is not None:
+                        # Upload image in the background without affecting main record
+                        filename = f"league_{t_sel}_{g_sel}_{p_sel}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{scorecard_pic.name.split('.')[-1]}"
+                        filename = filename.replace(" ", "_")
+                        success = github_upload_image(scorecard_pic.getvalue(), filename)
+                        if success:
+                            st.success(f"🖼️ 计分卡已成功上传。 Scorecard uploaded.")
+                        else:
+                            st.warning(f"⚠️ 成绩已保存，但计分卡上传失败。 Scorecard upload failed.")
+
                     st.success(f"✅ 已保存 {p_sel} 的成绩（共记录 {total_holes} 洞）！刷新后生效。")
                     st.rerun()
 

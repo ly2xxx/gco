@@ -121,6 +121,38 @@ def github_push_state(state: dict) -> bool:
     except Exception:
         return False
 
+def github_upload_image(file_bytes: bytes, file_name: str) -> bool:
+    """Upload an image to GitHub repository under 'scorecard_images/' folder."""
+    try:
+        import streamlit as st
+        token = st.secrets.get("GITHUB_TOKEN", "")
+        repo = st.secrets.get("GITHUB_REPO", "")
+        if not token or not repo:
+            return False
+            
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "Content-Type": "application/json",
+        }
+        
+        url = f"https://api.github.com/repos/{repo}/contents/scorecard_images/{file_name}"
+        
+        content_b64 = base64.b64encode(file_bytes).decode("ascii")
+        payload = {
+            "message": f"Upload scorecard image: {file_name}",
+            "content": content_b64,
+        }
+        
+        data = json.dumps(payload).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers, method="PUT")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status in (200, 201)
+    except Exception as e:
+        print(f"Error uploading image to GitHub: {e}")
+        return False
+
 def _sync_github_to_local(gh_state: dict) -> None:
     """Write the GitHub state dict to local data/ files (only when missing)."""
     def _missing(fname: str) -> bool:
