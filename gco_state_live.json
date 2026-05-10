@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-05-10T09:57:56.067600",
+  "export_date": "2026-05-10T19:06:46.732410",
   "events": [
     {
       "date": "2026-04-04",
@@ -432,22 +432,6 @@
     },
     {
       "Player": "Neo",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 2",
-      "Game_No": 2,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN
-    },
-    {
-      "Player": "徐峥",
       "Tournament": "2026个人联赛",
       "Game": "Game 2",
       "Game_No": 2,
@@ -1421,6 +1405,22 @@
       "Stableford": 0,
       "Date": "2026-05-09",
       "Venue": "Cathcart Castle"
+    },
+    {
+      "Player": "徐峥",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 2",
+      "Game_No": 2,
+      "Net_Score": 2,
+      "Gross_Score": 97,
+      "Birdies": 0,
+      "Pars": 2,
+      "Bogeys": 7,
+      "Double_Bogeys": 9,
+      "Eagles": 0,
+      "Stableford": 0,
+      "Date": "2026-05-10",
+      "Venue": "Pollok"
     }
   ]
 }
