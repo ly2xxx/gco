@@ -6,7 +6,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 from datetime import date, datetime
-import json, os, pathlib, base64, urllib.request, urllib.error
+import json, os, pathlib, base64, urllib.request, urllib.error, urllib.parse
 
 # ── root data directory ──────────────────────────────────────────────────────
 ROOT = pathlib.Path(__file__).parent
@@ -137,7 +137,8 @@ def github_upload_image(file_bytes: bytes, file_name: str) -> bool:
             "Content-Type": "application/json",
         }
         
-        url = f"https://api.github.com/repos/{repo}/contents/scorecard_images/{file_name}"
+        quoted_file_name = urllib.parse.quote(file_name)
+        url = f"https://api.github.com/repos/{repo}/contents/scorecard_images/{quoted_file_name}"
         
         content_b64 = base64.b64encode(file_bytes).decode("ascii")
         payload = {
