@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-05-09T23:31:34.832468",
+  "export_date": "2026-05-10T09:50:55.357674",
   "events": [
     {
       "date": "2026-04-04",
@@ -336,22 +336,6 @@
     },
     {
       "Player": "张纬",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 1",
-      "Game_No": 1,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN
-    },
-    {
-      "Player": "曹振波",
       "Tournament": "2026个人联赛",
       "Game": "Game 1",
       "Game_No": 1,
@@ -1421,6 +1405,22 @@
       "Stableford": 26,
       "Date": "2026-05-04",
       "Venue": "West Lothian"
+    },
+    {
+      "Player": "曹振波",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 1",
+      "Game_No": 1,
+      "Net_Score": 1,
+      "Gross_Score": 85,
+      "Birdies": 2,
+      "Pars": 4,
+      "Bogeys": 8,
+      "Double_Bogeys": 4,
+      "Eagles": 0,
+      "Stableford": 0,
+      "Date": "2026-05-09",
+      "Venue": "Cathcart Castle"
     }
   ]
 }
