@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-05-10T19:06:46.732410",
+  "export_date": "2026-05-16T17:28:54.729593",
   "events": [
     {
       "date": "2026-04-04",
@@ -159,8 +159,8 @@
         {
           "match": "P7 vs P10",
           "home": "P10",
-          "winner": null,
-          "score": ""
+          "winner": "P7",
+          "score": "1 Up"
         },
         {
           "match": "P8 vs P11",
