@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-05-25T21:13:23.328942",
+  "export_date": "2026-05-25T21:30:30.144216",
   "events": [
     {
       "date": "2026-04-04",
@@ -226,10 +226,12 @@
         "id": "om2",
         "name": "Outing Day 2: 2-men scramble",
         "date": "2026-05-31",
-        "venue": "TBD",
+        "venue": "Prestwick St Nicolas",
         "red_score": 0.0,
         "black_score": 0.0,
-        "status": "upcoming"
+        "status": "upcoming",
+        "red_players": [],
+        "black_players": []
       },
       {
         "id": "om3",
