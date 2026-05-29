@@ -180,14 +180,20 @@ if is_admin_user():
                                 winner_slot_save = slots2[0]
                             m_obj["winner"] = winner_slot_save
                             m_obj["score"] = score_input.strip()
-                            save_cup(cup)
-                            
+                            # Upload scorecard image first if provided
+                            upload_success = True
                             if scorecard_pic is not None:
                                 p2_slot_name = slots2[1] if len(slots2) > 1 else 'BYE'
                                 filename = f"cup_{rk}_{slots2[0]}_vs_{p2_slot_name}_{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}.{scorecard_pic.name.split('.')[-1]}"
                                 filename = filename.replace(" ", "_").replace("/", "_")
-                                success = github_upload_image(scorecard_pic.getvalue(), filename)
-                                if success:
+                                upload_success = github_upload_image(scorecard_pic.getvalue(), filename)
+                            
+                            # Save cup data (triggers background push of gco_state.json)
+                            save_cup(cup)
+                            
+                            # Show appropriate notifications
+                            if scorecard_pic is not None:
+                                if upload_success:
                                     st.success(f"🖼️ 计分卡已成功上传。 Scorecard uploaded.")
                                 else:
                                     st.warning(f"⚠️ 成绩已保存，但计分卡上传失败。 Scorecard upload failed.")

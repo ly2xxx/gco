@@ -296,14 +296,20 @@ if is_admin_user():
                         "Double_Bogeys": in_dbg,
                     }])
                     df = pd.concat([df, new_row], ignore_index=True)
-                    save_scores(df)
                     
+                    # Upload scorecard image first if provided
+                    upload_success = True
                     if scorecard_pic is not None:
-                        # Upload image in the background without affecting main record
                         filename = f"league_{t_sel}_{g_sel}_{p_sel}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{scorecard_pic.name.split('.')[-1]}"
                         filename = filename.replace(" ", "_")
-                        success = github_upload_image(scorecard_pic.getvalue(), filename)
-                        if success:
+                        upload_success = github_upload_image(scorecard_pic.getvalue(), filename)
+                    
+                    # Save scores (triggers background push of gco_state.json)
+                    save_scores(df)
+                    
+                    # Show appropriate notifications
+                    if scorecard_pic is not None:
+                        if upload_success:
                             st.success(f"🖼️ 计分卡已成功上传。 Scorecard uploaded.")
                         else:
                             st.warning(f"⚠️ 成绩已保存，但计分卡上传失败。 Scorecard upload failed.")
