@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-05-29T22:32:59.631965",
+  "export_date": "2026-05-31T20:20:14.734559",
   "events": [
     {
       "date": "2026-04-04",
@@ -227,11 +227,21 @@
         "name": "Outing Day 2: 2-men scramble",
         "date": "2026-05-31",
         "venue": "Prestwick St Nicolas",
-        "red_score": 0.0,
-        "black_score": 0.0,
-        "status": "upcoming",
-        "red_players": [],
-        "black_players": []
+        "red_score": 1.0,
+        "black_score": 1.0,
+        "status": "completed",
+        "red_players": [
+          "曾诚",
+          "赵鲲",
+          "Justin",
+          "刘北南"
+        ],
+        "black_players": [
+          "Neo",
+          "杨明",
+          "王文龙",
+          "徐峥"
+        ]
       },
       {
         "id": "om3",
