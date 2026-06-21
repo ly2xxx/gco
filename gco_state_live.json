@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-14T18:46:26.602364",
+  "export_date": "2026-06-21T13:53:27.698056",
   "events": [
     {
       "date": "2026-04-04",
@@ -282,22 +282,6 @@
   "scores": [
     {
       "Player": "刘北南",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 1",
-      "Game_No": 1,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN
-    },
-    {
-      "Player": "赵鲲",
       "Tournament": "2026个人联赛",
       "Game": "Game 1",
       "Game_No": 1,
@@ -1447,6 +1431,22 @@
       "Stableford": 0,
       "Date": "2026-06-13",
       "Venue": "Whitecraigs"
+    },
+    {
+      "Player": "赵鲲",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 1",
+      "Game_No": 1,
+      "Net_Score": 6,
+      "Gross_Score": 97,
+      "Birdies": 0,
+      "Pars": 4,
+      "Bogeys": 9,
+      "Double_Bogeys": 0,
+      "Eagles": 0,
+      "Stableford": 0,
+      "Date": "2026-06-21",
+      "Venue": "Archerfield Fidra"
     }
   ]
 }
