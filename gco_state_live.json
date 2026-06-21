@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-21T14:13:26.422658",
+  "export_date": "2026-06-21T14:15:48.556166",
   "events": [
     {
       "date": "2026-04-04",
@@ -261,10 +261,22 @@
         "id": "om3",
         "name": "Outing Day 3: 2-men stableford",
         "date": "2026-06-21",
-        "venue": "TBD",
+        "venue": "Cowglen",
         "red_score": 0.0,
         "black_score": 0.0,
-        "status": "upcoming"
+        "status": "upcoming",
+        "red_players": [
+          "李扬",
+          "赵鲲",
+          "张纬",
+          "曾诚"
+        ],
+        "black_players": [
+          "曹振波",
+          "Neo",
+          "Jacky",
+          "王文龙"
+        ]
       },
       {
         "id": "om4",
