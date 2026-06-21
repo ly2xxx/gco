@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-21T14:00:37.759575",
+  "export_date": "2026-06-21T14:02:10.898035",
   "events": [
     {
       "date": "2026-04-04",
@@ -1437,16 +1437,16 @@
       "Tournament": "2026个人联赛",
       "Game": "Game 3",
       "Game_No": 3,
-      "Net_Score": -3,
-      "Gross_Score": 102,
+      "Net_Score": 0,
+      "Gross_Score": 99,
       "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 8,
+      "Pars": 3,
+      "Bogeys": 2,
       "Double_Bogeys": 0,
       "Eagles": 0,
       "Stableford": 0,
-      "Date": "2026-06-17",
-      "Venue": "Gullane No.2"
+      "Date": "2026-06-19",
+      "Venue": "Gullane No.3"
     }
   ]
 }
