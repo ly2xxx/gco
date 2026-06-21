@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-21T13:57:04.479250",
+  "export_date": "2026-06-21T14:00:37.759575",
   "events": [
     {
       "date": "2026-04-04",
@@ -426,22 +426,6 @@
     },
     {
       "Player": "赵鲲",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 3",
-      "Game_No": 3,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN
-    },
-    {
-      "Player": "杨子初",
       "Tournament": "2026个人联赛",
       "Game": "Game 3",
       "Game_No": 3,
@@ -1442,6 +1426,22 @@
       "Birdies": 0,
       "Pars": 9,
       "Bogeys": 7,
+      "Double_Bogeys": 0,
+      "Eagles": 0,
+      "Stableford": 0,
+      "Date": "2026-06-17",
+      "Venue": "Gullane No.2"
+    },
+    {
+      "Player": "杨子初",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 3",
+      "Game_No": 3,
+      "Net_Score": -3,
+      "Gross_Score": 102,
+      "Birdies": 0,
+      "Pars": 0,
+      "Bogeys": 8,
       "Double_Bogeys": 0,
       "Eagles": 0,
       "Stableford": 0,
