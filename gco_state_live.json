@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-21T14:07:20.514456",
+  "export_date": "2026-06-21T14:11:08.006569",
   "events": [
     {
       "date": "2026-04-04",
@@ -474,22 +474,6 @@
     },
     {
       "Player": "曹振波",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 3",
-      "Game_No": 3,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN
-    },
-    {
-      "Player": "李扬",
       "Tournament": "2026个人联赛",
       "Game": "Game 3",
       "Game_No": 3,
@@ -1447,6 +1431,22 @@
       "Stableford": 0,
       "Date": "2026-06-19",
       "Venue": "Gullane No.3"
+    },
+    {
+      "Player": "李扬",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 3",
+      "Game_No": 3,
+      "Net_Score": 18,
+      "Gross_Score": 117,
+      "Birdies": 0,
+      "Pars": 2,
+      "Bogeys": 5,
+      "Double_Bogeys": 0,
+      "Eagles": 0,
+      "Stableford": 0,
+      "Date": "2026-06-17",
+      "Venue": "Archerfield Fidra"
     }
   ]
 }
