@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-24T22:16:57.696348",
+  "export_date": "2026-06-24T22:18:38.966789",
   "events": [
     {
       "date": "2026-04-04",
@@ -1449,8 +1449,8 @@
       "Tournament": "2026个人联赛",
       "Game": "Game 4",
       "Game_No": 4,
-      "Net_Score": 0,
-      "Gross_Score": 0,
+      "Net_Score": 1,
+      "Gross_Score": 97,
       "Birdies": 0,
       "Pars": 0,
       "Bogeys": 0,
@@ -1458,7 +1458,7 @@
       "Eagles": 0,
       "Stableford": 0,
       "Date": "2026-06-24",
-      "Venue": NaN
+      "Venue": "Glasgow Killermont"
     }
   ]
 }
