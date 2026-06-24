@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-23T17:25:16.547574",
+  "export_date": "2026-06-24T22:16:57.696348",
   "events": [
     {
       "date": "2026-04-04",
@@ -582,22 +582,6 @@
     },
     {
       "Player": "徐峥",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 4",
-      "Game_No": 4,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN
-    },
-    {
-      "Player": "张纬",
       "Tournament": "2026个人联赛",
       "Game": "Game 4",
       "Game_No": 4,
@@ -1459,6 +1443,22 @@
       "Stableford": 0,
       "Date": "2026-06-21",
       "Venue": "Cowglen"
+    },
+    {
+      "Player": "张纬",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 4",
+      "Game_No": 4,
+      "Net_Score": 0,
+      "Gross_Score": 0,
+      "Birdies": 0,
+      "Pars": 0,
+      "Bogeys": 0,
+      "Double_Bogeys": 0,
+      "Eagles": 0,
+      "Stableford": 0,
+      "Date": "2026-06-24",
+      "Venue": NaN
     }
   ]
 }
