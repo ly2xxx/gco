@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-24T22:18:38.966789",
+  "export_date": "2026-06-24T22:18:57.007334",
   "events": [
     {
       "date": "2026-04-04",
@@ -1452,8 +1452,8 @@
       "Net_Score": 1,
       "Gross_Score": 97,
       "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
+      "Pars": 3,
+      "Bogeys": 6,
       "Double_Bogeys": 0,
       "Eagles": 0,
       "Stableford": 0,
