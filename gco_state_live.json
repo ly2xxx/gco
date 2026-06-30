@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-06-25T19:23:56.615242",
+  "export_date": "2026-06-30T23:50:38.489364",
   "events": [
     {
       "date": "2026-04-04",
@@ -390,22 +390,6 @@
     },
     {
       "Player": "徐峥",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 3",
-      "Game_No": 3,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN
-    },
-    {
-      "Player": "曹振波",
       "Tournament": "2026个人联赛",
       "Game": "Game 3",
       "Game_No": 3,
@@ -1458,6 +1442,22 @@
       "Eagles": 0,
       "Stableford": 0,
       "Date": "2026-06-25",
+      "Venue": "Pollok"
+    },
+    {
+      "Player": "曹振波",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 3",
+      "Game_No": 3,
+      "Net_Score": 2,
+      "Gross_Score": 87,
+      "Birdies": 1,
+      "Pars": 8,
+      "Bogeys": 4,
+      "Double_Bogeys": 0,
+      "Eagles": 0,
+      "Stableford": 0,
+      "Date": "2026-06-30",
       "Venue": "Pollok"
     }
   ]
