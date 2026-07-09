@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-09T22:46:23.747020",
+  "export_date": "2026-07-09T22:48:29.316707",
   "events": [
     {
       "date": "2026-04-04",
@@ -1465,6 +1465,22 @@
       "Double_Bogeys": 9,
       "Eagles": 0,
       "Stableford": 0,
+      "Date": "2026-07-09",
+      "Venue": "Pollok"
+    },
+    {
+      "Player": "杨明",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 2",
+      "Game_No": 2,
+      "Net_Score": 2,
+      "Gross_Score": 92,
+      "Birdies": 0,
+      "Pars": 4,
+      "Bogeys": 9,
+      "Double_Bogeys": 5,
+      "Eagles": 0,
+      "Stableford": 36,
       "Date": "2026-07-09",
       "Venue": "Pollok"
     }
