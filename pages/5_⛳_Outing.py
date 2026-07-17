@@ -3,7 +3,7 @@ GCO 2026 – Outing Day (Red vs Black 对抗赛)
 """
 import streamlit as st
 import plotly.graph_objects as go
-from theme import inject_theme, hero, section
+from theme import inject_theme, hero, section, flash, show_flash, sync_status
 from data import load_outing, save_outing
 from auth import is_admin_user
 
@@ -11,6 +11,7 @@ st.set_page_config(page_title="GCO | Outing Day", page_icon="⛳", layout="wide"
 inject_theme(st)
 
 hero(st, "⛳ Outing Day 对抗赛", "Red vs Black Team Outings", "GCO 2026")
+show_flash(st)
 
 outing_data = load_outing()
 red_t = outing_data["red_team"]
@@ -81,6 +82,8 @@ elif black_score >= win_thresh:
 
 # ── Match details ──────────────────────────────────────────────────────────────
 section(st, "⚔️", "比赛概况 Matches")
+if is_admin_user():
+    sync_status(st)
 
 for m in matches:
     col1, col2 = st.columns([3, 1])
@@ -167,6 +170,6 @@ for m in matches:
                     m["black_players"] = new_black_players
                     m["status"] = new_status
                     save_outing(outing_data)
-                    st.success("比赛信息及赛果已更新！Match updated successfully!")
+                    flash(st, f"✅ 已更新 {m['name']}：🔴 {new_red} vs ⚫ {new_black}。 Match updated.")
                     st.rerun()
     st.markdown("---")

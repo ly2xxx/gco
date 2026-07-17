@@ -1564,13 +1564,41 @@ def _schedule_github_push() -> None:
 
     Running in a daemon thread means the Streamlit response is returned
     immediately — the GitHub API call (~200 ms) does not block the user.
+    The outcome is recorded via _record_sync_status so admin pages can
+    show whether the last push actually reached GitHub.
     """
     import threading
     def _push():
+        if _gh_headers() is None or _gh_api_url() is None:
+            _record_sync_status("disabled")
+            return
         state = export_app_state()
-        github_push_state(state)
+        ok = github_push_state(state)
+        _record_sync_status("ok" if ok else "failed")
     t = threading.Thread(target=_push, daemon=True)
     t.start()
+
+# ── Sync status (written by the push thread, read by admin pages) ─────────────
+SYNC_STATUS_FILE = DATA_DIR / ".sync_status.json"
+
+def _record_sync_status(status: str) -> None:
+    """status: 'ok' | 'failed' | 'disabled'."""
+    try:
+        SYNC_STATUS_FILE.write_text(json.dumps({
+            "status": status,
+            "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }), encoding="utf-8")
+    except Exception:
+        pass
+
+def get_sync_status() -> dict | None:
+    """Return {'status', 'time'} for the most recent push attempt, or None."""
+    try:
+        if SYNC_STATUS_FILE.exists():
+            return json.loads(SYNC_STATUS_FILE.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    return None
 
 def import_app_state(state: dict) -> None:
     """Import application state from a dictionary."""

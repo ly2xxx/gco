@@ -6,7 +6,7 @@ import json
 import datetime
 
 import streamlit as st
-from theme import inject_theme, hero, section
+from theme import inject_theme, hero, section, flash, show_flash, sync_status
 from data import load_cup, save_cup, PLAYERS, github_upload_image
 from auth import is_admin_user
 
@@ -14,6 +14,7 @@ st.set_page_config(page_title="GCO | 个人杯赛", page_icon="🥊", layout="wi
 inject_theme(st)
 
 hero(st, "🥊 个人杯赛", "Knockout Match Play Bracket", "GCO 2026")
+show_flash(st)
 
 cup = load_cup()
 draw = cup["draw"]        # {"P1": "刘北南", …}
@@ -150,6 +151,7 @@ for col_idx, (rk, rl) in enumerate(ROUND_LABELS.items()):
 # ── Record Match Result Forms ─────────────────────────────────────────────────
 if is_admin_user():
     section(st, "✏️", "录入赛果 Record Results")
+    sync_status(st)
     round_tabs = st.tabs(list(ROUND_LABELS.values()))
     for tab, (rk, rl) in zip(round_tabs, ROUND_LABELS.items()):
         with tab:
@@ -190,15 +192,15 @@ if is_admin_user():
                             
                             # Save cup data (triggers background push of gco_state.json)
                             save_cup(cup)
-                            
-                            # Show appropriate notifications
+
+                            # Queue feedback so it survives the rerun
+                            score_txt = f"（{score_input.strip()}）" if score_input.strip() else ""
+                            flash(st, f"✅ 已记录 {rl}：{winner_choice} 获胜{score_txt}！ Result saved: {winner_choice} wins.")
                             if scorecard_pic is not None:
                                 if upload_success:
-                                    st.success(f"🖼️ 计分卡已成功上传。 Scorecard uploaded.")
+                                    flash(st, "🖼️ 计分卡已成功上传。 Scorecard uploaded.")
                                 else:
-                                    st.warning(f"⚠️ 成绩已保存，但计分卡上传失败。 Scorecard upload failed.")
-
-                            st.success(f"✅ 已记录：{winner_choice} 获胜！")
+                                    flash(st, "⚠️ 赛果已保存，但计分卡上传失败，请稍后重试。 Scorecard upload failed — please retry.", kind="warning")
                             st.rerun()
 
     # ── Admin: advance to next round ──────────────────────────────────────────────
@@ -219,7 +221,7 @@ if is_admin_user():
             if st.form_submit_button("💾 保存日期 Save Dates"):
                 cup["play_by_dates"] = {k: v.strftime("%Y-%m-%d") for k, v in new_dates.items() if v}
                 save_cup(cup)
-                st.success("✅ 完赛日期已更新！")
+                flash(st, "✅ 完赛日期已更新！ Play-by dates saved.")
                 st.rerun()
 
     with st.expander("🔧 推进赛程 Advance Rounds & Fixtures"):
@@ -241,7 +243,7 @@ if is_admin_user():
                     new_matches.append({"match": ml, "home": hm, "winner": None, "score": ""})
                 cup["rounds"][rk_select] = new_matches
                 save_cup(cup)
-                st.success(f"✅ {ROUND_LABELS[rk_select]} 对阵已设置！")
+                flash(st, f"✅ {ROUND_LABELS[rk_select]} 对阵已设置（共 {len(new_matches)} 场）！ Fixtures saved.")
                 st.rerun()
 
     with st.expander("👥 管理初始抽签名单 Manage Initial Draw"):
@@ -264,5 +266,5 @@ if is_admin_user():
             if st.form_submit_button("💾 保存名单 Save Draw Configuration"):
                 cup["draw"] = new_draw
                 save_cup(cup)
-                st.success("✅ 抽签名单已更新！")
+                flash(st, "✅ 抽签名单已更新！ Draw configuration saved.")
                 st.rerun()

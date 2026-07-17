@@ -6,7 +6,7 @@ import streamlit as st
 import json
 import base64
 from datetime import datetime
-from theme import inject_theme, hero, section
+from theme import inject_theme, hero, section, flash, show_flash, sync_status
 from auth import is_admin_user
 from data import (
     load_scores, save_scores,
@@ -17,6 +17,7 @@ from data import (
     save_to_backup, list_backups, compute_diff,
     export_app_state, import_app_state,
     github_push_state, github_load_state,
+    _record_sync_status,
     BACKUP_DIR,
 )
 
@@ -28,6 +29,7 @@ if not is_admin_user():
     st.stop()
 
 hero(st, "💾 Data API & Management", "Export and Import Application Data", "GCO 2026 Admin")
+show_flash(st)
 
 state_data = export_app_state()
 json_string = json.dumps(state_data, ensure_ascii=False, indent=2)
@@ -116,6 +118,7 @@ else:
     st.success(
         f"✅ GitHub sync is **active** — repo: `{_repo}`, file: `{_path}`"
     )
+    sync_status(st)
     # Show what’s currently saved in GitHub vs current state
     gh_col, push_col = st.columns([3, 1])
     with gh_col:
@@ -131,6 +134,7 @@ else:
         if st.button("🚀 Push to GitHub Now", help="Immediately sync current app state to GitHub"):
             with st.spinner("Pushing to GitHub…"):
                 ok = github_push_state(state_data)
+            _record_sync_status("ok" if ok else "failed")
             if ok:
                 st.success("✅ Pushed successfully!")
             else:
@@ -232,6 +236,6 @@ else:
 
     if st.button("🚨 CONFIRM RESTORE FROM BACKUP", type="primary"):
         import_app_state(backup["data"])
-        st.success("✅ Data successfully restored from backup! Please refresh the application.")
-        st.balloons()
+        flash(st, f"✅ Data restored from backup **{backup['filename']}**.")
+        st.rerun()
 

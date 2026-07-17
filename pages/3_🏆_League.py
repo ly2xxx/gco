@@ -5,15 +5,16 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-from theme import inject_theme, hero, section
+from theme import inject_theme, hero, section, flash, show_flash, sync_status
 from data import load_scores, save_scores, LEAGUE_TOURNAMENTS, PLAYERS, github_upload_image
-from auth import is_admin_user
+from auth import is_admin_user, get_admin_name
 from datetime import date, datetime
 
 st.set_page_config(page_title="GCO | 联赛", page_icon="🏆", layout="wide")
 inject_theme(st)
 
 hero(st, "🏆 个人联赛", "Individual League Standings", "GCO 2026")
+show_flash(st)
 
 df = load_scores()
 
@@ -212,6 +213,7 @@ if not p_df.empty:
 # ── Admin: Record Results ─────────────────────────────────────────────────────
 if is_admin_user():
     section(st, "⚙️", "管理 Admin: Record Results")
+    sync_status(st)
 
     with st.expander("📝 录入或修改成绩 Record / Edit Scores", expanded=False):
         t_names = list(LEAGUE_TOURNAMENTS.keys())
@@ -229,20 +231,41 @@ if is_admin_user():
         mask = (df["Player"] == p_sel) & (df["Tournament"] == t_sel) & (df["Game"] == g_sel)
         existing_row = df[mask]
 
-        if not existing_row.empty:
+        # Placeholder rows (Gross_Score 0) mean the game hasn't been played —
+        # treat them as "no score yet", not as an existing record.
+        has_real_score = (
+            not existing_row.empty
+            and pd.notna(existing_row.iloc[0].get("Gross_Score"))
+            and float(existing_row.iloc[0]["Gross_Score"]) > 0
+        )
+
+        if has_real_score:
             rec = existing_row.iloc[0].to_dict()
-            st.info("💡 该场次已有成绩，保存将覆盖原纪录。 Existing record found.")
+            played_on = str(rec["Date"]) if pd.notna(rec.get("Date")) else "未知日期"
+            entered_by = str(rec["Updated_By"]) if pd.notna(rec.get("Updated_By")) else ""
+            entered_at = str(rec["Updated_At"]) if pd.notna(rec.get("Updated_At")) else ""
+            audit_txt = ""
+            if entered_by or entered_at:
+                audit_txt = f"（{entered_by or '管理员'} 录入于 {entered_at or '未知时间'}）"
+            st.info(
+                f"💡 该场次已有成绩{audit_txt}：净杆 **{int(rec.get('Net_Score', 0))}** · "
+                f"总杆 **{int(rec.get('Gross_Score', 0))}** · 比赛日期 {played_on}。"
+                f"如需修改请直接编辑下方表单，保存后将覆盖此纪录。\n\n"
+                f"Existing score: Net {int(rec.get('Net_Score', 0))}, "
+                f"Gross {int(rec.get('Gross_Score', 0))}, played {played_on}. "
+                f"Saving will overwrite it."
+            )
         else:
             rec = {
                 "Net_Score": 0, "Gross_Score": 72, "Stableford": 36,
                 "Eagles": 0, "Birdies": 0, "Pars": 0, "Bogeys": 0, "Double_Bogeys": 0
             }
-            st.info("🆕 暂无成绩，将创建新纪录。 No existing record.")
+            st.info(f"🆕 {p_sel} 的 {g_sel} 暂无成绩，保存后将创建新纪录。 No score recorded yet — saving will create one.")
 
         with st.form("league_score_form"):
             vc1, vc2 = st.columns(2)
             def_date = date.today()
-            if "Date" in rec and __import__("pandas").notna(rec.get("Date")):
+            if "Date" in rec and pd.notna(rec.get("Date")):
                 try:
                     def_date = datetime.strptime(str(rec["Date"]), "%Y-%m-%d").date()
                 except:
@@ -294,26 +317,30 @@ if is_admin_user():
                         "Pars": in_par,
                         "Bogeys": in_bg,
                         "Double_Bogeys": in_dbg,
+                        "Updated_At": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                        "Updated_By": get_admin_name(),
                     }])
                     df = pd.concat([df, new_row], ignore_index=True)
-                    
+
                     # Upload scorecard image first if provided
                     upload_success = True
                     if scorecard_pic is not None:
                         filename = f"league_{t_sel}_{g_sel}_{p_sel}_{datetime.now().strftime('%Y%m%d%H%M%S')}.{scorecard_pic.name.split('.')[-1]}"
                         filename = filename.replace(" ", "_")
                         upload_success = github_upload_image(scorecard_pic.getvalue(), filename)
-                    
+
                     # Save scores (triggers background push of gco_state.json)
                     save_scores(df)
-                    
-                    # Show appropriate notifications
+
+                    # Queue feedback so it survives the rerun
+                    action = "已更新" if has_real_score else "已保存"
+                    verb = "updated" if has_real_score else "saved"
+                    flash(st, f"✅ {action} {p_sel} · {t_sel} {g_sel}：净杆 {in_net}，总杆 {in_gross}。 "
+                              f"Score {verb} for {p_sel}.")
                     if scorecard_pic is not None:
                         if upload_success:
-                            st.success(f"🖼️ 计分卡已成功上传。 Scorecard uploaded.")
+                            flash(st, "🖼️ 计分卡已成功上传。 Scorecard uploaded.")
                         else:
-                            st.warning(f"⚠️ 成绩已保存，但计分卡上传失败。 Scorecard upload failed.")
-
-                    st.success(f"✅ 已保存 {p_sel} 的成绩（共记录 {total_holes} 洞）！刷新后生效。")
+                            flash(st, "⚠️ 成绩已保存，但计分卡上传失败，请稍后重试。 Scorecard upload failed — please retry.", kind="warning")
                     st.rerun()
 

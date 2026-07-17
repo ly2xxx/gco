@@ -3,7 +3,7 @@ GCO 2026 – Announcements page
 """
 import streamlit as st
 from datetime import date
-from theme import inject_theme, hero, section
+from theme import inject_theme, hero, section, flash, show_flash, sync_status
 from data import load_announcements, save_announcements
 from auth import is_admin_user
 
@@ -11,6 +11,7 @@ st.set_page_config(page_title="GCO | 公告", page_icon="📢", layout="wide")
 inject_theme(st)
 
 hero(st, "📢 俱乐部公告", "Club Announcements", "GCO 2026")
+show_flash(st)
 
 anns = load_announcements()
 # Sort: pinned first, then by date desc
@@ -53,6 +54,7 @@ for ann in anns_sorted:
 # ── Admin: post new announcement ──────────────────────────────────────────────
 if is_admin_user():
     section(st, "✏️", "发布新公告")
+    sync_status(st)
 
     with st.expander("➕ 发布新公告 / Post New Announcement", expanded=False):
         with st.form("new_ann_form", clear_on_submit=True):
@@ -93,8 +95,8 @@ if is_admin_user():
                     }
                     anns.append(new_ann)
                     save_announcements(anns)
-                    st.success("✅ 公告已发布！请刷新页面查看。")
-                    st.balloons()
+                    flash(st, f"✅ 公告已发布：《{new_ann['title']}》 Announcement published.")
+                    st.rerun()
 
     # ── Admin: edit / delete existing announcements ────────────────────────────
     if anns:
@@ -150,11 +152,11 @@ if is_admin_user():
                         "pinned": edit_pinned,
                     })
                     save_announcements(anns)
-                    st.success("✅ 公告已更新！")
+                    flash(st, f"✅ 公告已更新：《{edit_title.strip()}》 Announcement updated.")
                     st.rerun()
 
             if delete_ann:
-                anns.pop(sel_idx)
+                removed = anns.pop(sel_idx)
                 save_announcements(anns)
-                st.success("🗑️ 公告已删除！")
+                flash(st, f"🗑️ 公告已删除：《{removed['title']}》 Announcement deleted.")
                 st.rerun()

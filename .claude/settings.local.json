@@ -7,7 +7,12 @@
       "Bash(./download_data.sh:*)",
       "Bash(dos2unix:*)",
       "Bash(sed:*)",
-      "Bash(timeout:*)"
+      "Bash(timeout:*)",
+      "Bash(.venv/Scripts/python.exe -m py_compile theme.py data.py auth.py streamlit_app.py \"pages/1_📢_Announcements.py\" \"pages/2_📅_Events.py\" \"pages/3_🏆_League.py\" \"pages/4_🥊_Cup.py\" \"pages/5_⛳_Outing.py\" \"pages/6_💾_API_Data.py\")",
+      "Bash(.venv/Scripts/python.exe -m pytest test_streamlit_app.py -v)",
+      "Bash(.venv/Scripts/python.exe -)",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/python.exe -)",
+      "Bash(.venv/Scripts/python.exe -m flake8 theme.py data.py auth.py pages/ --count --select=E9,F63,F7,F82 --show-source --statistics)"
     ],
     "deny": []
   }

@@ -235,6 +235,45 @@ def section(st_module, icon: str, title: str):
     )
 
 
+# ── Flash messages (survive st.rerun) ──────────────────────────────────────────
+# st.success(...) followed by st.rerun() never reaches the screen — the rerun
+# discards the render. Queue the message instead and show it on the next run.
+
+def flash(st_module, message: str, kind: str = "success"):
+    """Queue a message to be displayed after the next st.rerun()."""
+    st_module.session_state.setdefault("_gco_flash", []).append(
+        {"kind": kind, "msg": message}
+    )
+
+
+def show_flash(st_module):
+    """Render and clear queued flash messages. Call once near the top of every page."""
+    for m in st_module.session_state.pop("_gco_flash", []):
+        renderer = getattr(st_module, m["kind"], st_module.info)
+        renderer(m["msg"])
+        try:
+            st_module.toast(m["msg"])
+        except Exception:
+            pass  # older Streamlit without st.toast
+
+
+def sync_status(st_module):
+    """Show admins whether the last GitHub push succeeded (call inside admin sections)."""
+    from data import get_sync_status
+    s = get_sync_status()
+    if not s:
+        st_module.caption("☁️ 云端同步：本次会话暂无同步记录 · No GitHub sync recorded yet")
+    elif s.get("status") == "ok":
+        st_module.caption(f"☁️ 云端同步正常 · Synced to GitHub at {s.get('time', '?')}")
+    elif s.get("status") == "disabled":
+        st_module.caption("☁️ 未配置 GitHub 同步，数据仅保存在本机 · GitHub sync not configured — data is saved locally only")
+    else:
+        st_module.warning(
+            f"⚠️ 上次云端同步失败（{s.get('time', '?')}）。成绩已保存在本地，但尚未推送到 GitHub，"
+            "应用重启后可能丢失，请检查 Data API 页面。 Last GitHub sync failed — recent changes are not backed up."
+        )
+
+
 EVENT_COLORS = {
     "League":      ("pill-league", "联赛"),
     "Cup":         ("pill-cup",    "杯赛"),

@@ -3,7 +3,7 @@ GCO 2026 – Events Calendar page
 """
 import streamlit as st
 from datetime import date, datetime
-from theme import inject_theme, hero, section, EVENT_COLORS
+from theme import inject_theme, hero, section, EVENT_COLORS, flash, show_flash, sync_status
 from data import load_events, save_events
 from auth import is_admin_user
 
@@ -11,6 +11,7 @@ st.set_page_config(page_title="GCO | 赛历", page_icon="📅", layout="wide")
 inject_theme(st)
 
 hero(st, "📅 2026赛历", "Season Schedule & Upcoming Events", "GCO 2026")
+show_flash(st)
 
 events = load_events()
 
@@ -79,6 +80,7 @@ else:
 # ── Admin: add / edit events ──────────────────────────────────────────────────
 if is_admin_user():
     section(st, "⚙️", "管理赛事")
+    sync_status(st)
 
     with st.expander("➕ 添加赛事 / Add Event", expanded=False):
         with st.form("add_event_form", clear_on_submit=True):
@@ -101,7 +103,7 @@ if is_admin_user():
                         "details": ev_details.strip(),
                     })
                     save_events(events)
-                    st.success("✅ 赛事已添加！请刷新查看。")
+                    flash(st, f"✅ 赛事已添加：{ev_name.strip()}（{ev_date_input}）。 Event added.")
                     st.rerun()
 
     # ── Admin: edit / delete existing events ──────────────────────────────────
@@ -154,11 +156,11 @@ if is_admin_user():
                         "details": edit_ev_details.strip(),
                     })
                     save_events(events)
-                    st.success("✅ 赛事已更新！")
+                    flash(st, f"✅ 赛事已更新：{edit_ev_name.strip()}。 Event updated.")
                     st.rerun()
 
             if delete_ev:
-                events.pop(ev_sel_idx)
+                removed_ev = events.pop(ev_sel_idx)
                 save_events(events)
-                st.success("🗑️ 赛事已删除！")
+                flash(st, f"🗑️ 赛事已删除：{removed_ev['name']}。 Event deleted.")
                 st.rerun()
