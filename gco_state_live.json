@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-20T20:12:53.493419",
+  "export_date": "2026-07-20T20:14:38.373178",
   "events": [
     {
       "date": "2026-04-04",
@@ -320,24 +320,6 @@
     },
     {
       "Player": "刘北南",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 3",
-      "Game_No": 3,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN,
-      "Updated_At": NaN,
-      "Updated_By": NaN
-    },
-    {
-      "Player": "徐峥",
       "Tournament": "2026个人联赛",
       "Game": "Game 3",
       "Game_No": 3,
@@ -1630,6 +1612,24 @@
       "Date": "2026-07-19",
       "Venue": "St Nicholas",
       "Updated_At": "2026-07-20 20:12",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "徐峥",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 3",
+      "Game_No": 3,
+      "Net_Score": -7,
+      "Gross_Score": 87,
+      "Birdies": 3,
+      "Pars": 5,
+      "Bogeys": 6,
+      "Double_Bogeys": 4,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-07-19",
+      "Venue": "St Nicholas",
+      "Updated_At": "2026-07-20 20:14",
       "Updated_By": "admin"
     }
   ]
