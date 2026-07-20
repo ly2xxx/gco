@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-20T20:17:36.559769",
+  "export_date": "2026-07-20T20:19:17.187624",
   "events": [
     {
       "date": "2026-04-04",
@@ -392,24 +392,6 @@
     },
     {
       "Player": "杨子初",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 4",
-      "Game_No": 4,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN,
-      "Updated_At": NaN,
-      "Updated_By": NaN
-    },
-    {
-      "Player": "Neo",
       "Tournament": "2026个人联赛",
       "Game": "Game 4",
       "Game_No": 4,
@@ -1630,6 +1612,24 @@
       "Date": "2026-07-19",
       "Venue": "Carthcard",
       "Updated_At": "2026-07-20 20:17",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "Neo",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 4",
+      "Game_No": 4,
+      "Net_Score": 4,
+      "Gross_Score": 88,
+      "Birdies": 0,
+      "Pars": 4,
+      "Bogeys": 10,
+      "Double_Bogeys": 4,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-07-19",
+      "Venue": "Carthcard",
+      "Updated_At": "2026-07-20 20:19",
       "Updated_By": "admin"
     }
   ]
