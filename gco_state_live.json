@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-20T20:21:18.780684",
+  "export_date": "2026-07-20T20:22:19.182830",
   "events": [
     {
       "date": "2026-04-04",
@@ -374,24 +374,6 @@
     },
     {
       "Player": "刘北南",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 4",
-      "Game_No": 4,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN,
-      "Updated_At": NaN,
-      "Updated_By": NaN
-    },
-    {
-      "Player": "杨子初",
       "Tournament": "2026个人联赛",
       "Game": "Game 4",
       "Game_No": 4,
@@ -1630,6 +1612,24 @@
       "Date": "2026-07-19",
       "Venue": "Carthcard",
       "Updated_At": "2026-07-20 20:21",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "杨子初",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 4",
+      "Game_No": 4,
+      "Net_Score": 0,
+      "Gross_Score": 72,
+      "Birdies": 0,
+      "Pars": 0,
+      "Bogeys": 0,
+      "Double_Bogeys": 0,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-07-19",
+      "Venue": "Royal Burges",
+      "Updated_At": "2026-07-20 20:22",
       "Updated_By": "admin"
     }
   ]
