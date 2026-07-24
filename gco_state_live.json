@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-20T21:09:25.463883",
+  "export_date": "2026-07-24T19:03:30.836233",
   "events": [
     {
       "date": "2026-04-04",
@@ -1630,6 +1630,24 @@
       "Date": "2026-07-19",
       "Venue": "Cathcart",
       "Updated_At": "2026-07-20 21:09",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "杨明",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 3",
+      "Game_No": 3,
+      "Net_Score": -7,
+      "Gross_Score": 84,
+      "Birdies": 1,
+      "Pars": 7,
+      "Bogeys": 6,
+      "Double_Bogeys": 4,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-07-23",
+      "Venue": "East Kilbride",
+      "Updated_At": "2026-07-24 19:03",
       "Updated_By": "admin"
     }
   ]
