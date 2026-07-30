@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-30T22:46:31.207502",
+  "export_date": "2026-07-30T22:47:23.246248",
   "events": [
     {
       "date": "2026-04-04",
@@ -1658,14 +1658,14 @@
       "Net_Score": 8,
       "Gross_Score": 97,
       "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
+      "Pars": 4,
+      "Bogeys": 6,
       "Double_Bogeys": 0,
       "Eagles": 0,
       "Stableford": 36,
       "Date": "2026-07-30",
       "Venue": "Pollok",
-      "Updated_At": "2026-07-30 22:46",
+      "Updated_At": "2026-07-30 22:47",
       "Updated_By": "admin"
     }
   ]
