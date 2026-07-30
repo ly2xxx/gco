@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-30T22:39:47.583825",
+  "export_date": "2026-07-30T22:41:32.032132",
   "events": [
     {
       "date": "2026-04-04",
@@ -716,24 +716,6 @@
     },
     {
       "Player": "张纬",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 6",
-      "Game_No": 6,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN,
-      "Updated_At": NaN,
-      "Updated_By": NaN
-    },
-    {
-      "Player": "曹振波",
       "Tournament": "2026个人联赛",
       "Game": "Game 6",
       "Game_No": 6,
@@ -1648,6 +1630,24 @@
       "Date": "2026-07-19",
       "Venue": "Cathcart",
       "Updated_At": "2026-07-30 22:39",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "曹振波",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 6",
+      "Game_No": 6,
+      "Net_Score": 5,
+      "Gross_Score": 90,
+      "Birdies": 1,
+      "Pars": 2,
+      "Bogeys": 11,
+      "Double_Bogeys": 4,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-07-30",
+      "Venue": "Pollok",
+      "Updated_At": "2026-07-30 22:41",
       "Updated_By": "admin"
     }
   ]
