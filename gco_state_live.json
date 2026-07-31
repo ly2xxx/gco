@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-31T23:33:36.484032",
+  "export_date": "2026-07-31T23:34:16.961034",
   "events": [
     {
       "date": "2026-04-04",
@@ -1673,8 +1673,8 @@
       "Tournament": "2026个人联赛",
       "Game": "Game 5",
       "Game_No": 5,
-      "Net_Score": 0,
-      "Gross_Score": 72,
+      "Net_Score": -1,
+      "Gross_Score": 89,
       "Birdies": 0,
       "Pars": 4,
       "Bogeys": 9,
@@ -1683,7 +1683,7 @@
       "Stableford": 36,
       "Date": "2026-07-31",
       "Venue": "East Kilbride",
-      "Updated_At": "2026-07-31 23:33",
+      "Updated_At": "2026-07-31 23:34",
       "Updated_By": "admin"
     }
   ]
