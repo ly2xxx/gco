@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-07-31T23:35:19.572044",
+  "export_date": "2026-08-01T22:31:05.717118",
   "events": [
     {
       "date": "2026-04-04",
@@ -410,24 +410,6 @@
     },
     {
       "Player": "刘北南",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 5",
-      "Game_No": 5,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN,
-      "Updated_At": NaN,
-      "Updated_By": NaN
-    },
-    {
-      "Player": "赵鲲",
       "Tournament": "2026个人联赛",
       "Game": "Game 5",
       "Game_No": 5,
@@ -1684,6 +1666,24 @@
       "Date": "2026-07-31",
       "Venue": "East Kilbride",
       "Updated_At": "2026-07-31 23:35",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "赵鲲",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 5",
+      "Game_No": 5,
+      "Net_Score": 5,
+      "Gross_Score": 95,
+      "Birdies": 1,
+      "Pars": 2,
+      "Bogeys": 8,
+      "Double_Bogeys": 7,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-08-01",
+      "Venue": "Prestwick St. Nicolas",
+      "Updated_At": "2026-08-01 22:31",
       "Updated_By": "admin"
     }
   ]
