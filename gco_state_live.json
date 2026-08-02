@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-08-02T22:25:10.456384",
+  "export_date": "2026-08-02T22:26:26.142981",
   "events": [
     {
       "date": "2026-04-04",
@@ -428,24 +428,6 @@
     },
     {
       "Player": "Neo",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 5",
-      "Game_No": 5,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN,
-      "Updated_At": NaN,
-      "Updated_By": NaN
-    },
-    {
-      "Player": "徐峥",
       "Tournament": "2026个人联赛",
       "Game": "Game 5",
       "Game_No": 5,
@@ -1684,6 +1666,24 @@
       "Date": "2026-08-02",
       "Venue": "Pollok",
       "Updated_At": "2026-08-02 22:25",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "徐峥",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 5",
+      "Game_No": 5,
+      "Net_Score": 7,
+      "Gross_Score": 101,
+      "Birdies": 0,
+      "Pars": 2,
+      "Bogeys": 7,
+      "Double_Bogeys": 9,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-08-02",
+      "Venue": "Pollok",
+      "Updated_At": "2026-08-02 22:26",
       "Updated_By": "admin"
     }
   ]
