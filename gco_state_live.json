@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-08-02T22:26:26.142981",
+  "export_date": "2026-08-02T22:28:39.080324",
   "events": [
     {
       "date": "2026-04-04",
@@ -1684,6 +1684,24 @@
       "Date": "2026-08-02",
       "Venue": "Pollok",
       "Updated_At": "2026-08-02 22:26",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "杨明",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 6",
+      "Game_No": 6,
+      "Net_Score": 0,
+      "Gross_Score": 90,
+      "Birdies": 0,
+      "Pars": 4,
+      "Bogeys": 9,
+      "Double_Bogeys": 5,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-08-02",
+      "Venue": "East Kilbride",
+      "Updated_At": "2026-08-02 22:28",
       "Updated_By": "admin"
     }
   ]
