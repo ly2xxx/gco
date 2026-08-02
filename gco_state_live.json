@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-08-02T22:23:40.945778",
+  "export_date": "2026-08-02T22:25:10.456384",
   "events": [
     {
       "date": "2026-04-04",
@@ -500,24 +500,6 @@
     },
     {
       "Player": "刘北南",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 6",
-      "Game_No": 6,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN,
-      "Updated_At": NaN,
-      "Updated_By": NaN
-    },
-    {
-      "Player": "赵鲲",
       "Tournament": "2026个人联赛",
       "Game": "Game 6",
       "Game_No": 6,
@@ -1684,6 +1666,24 @@
       "Date": "2026-08-02",
       "Venue": "Pollok",
       "Updated_At": "2026-08-02 22:23",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "赵鲲",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 6",
+      "Game_No": 6,
+      "Net_Score": 0,
+      "Gross_Score": 91,
+      "Birdies": 0,
+      "Pars": 5,
+      "Bogeys": 7,
+      "Double_Bogeys": 6,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-08-02",
+      "Venue": "Pollok",
+      "Updated_At": "2026-08-02 22:25",
       "Updated_By": "admin"
     }
   ]
