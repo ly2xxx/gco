@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-08-09T22:54:08.794083",
+  "export_date": "2026-08-09T22:55:39.287581",
   "events": [
     {
       "date": "2026-04-04",
@@ -1615,24 +1615,6 @@
       "Updated_By": "admin"
     },
     {
-      "Player": "李扬",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 5",
-      "Game_No": 5,
-      "Net_Score": 0,
-      "Gross_Score": 72,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 36,
-      "Date": "2026-08-03",
-      "Venue": NaN,
-      "Updated_At": "2026-08-03 07:52",
-      "Updated_By": "admin"
-    },
-    {
       "Player": "张纬",
       "Tournament": "2026个人联赛",
       "Game": "Game 6",
@@ -1702,6 +1684,24 @@
       "Date": "2026-08-09",
       "Venue": "Pollok",
       "Updated_At": "2026-08-09 22:54",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "李扬",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 5",
+      "Game_No": 5,
+      "Net_Score": 3,
+      "Gross_Score": 100,
+      "Birdies": 0,
+      "Pars": 2,
+      "Bogeys": 7,
+      "Double_Bogeys": 9,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-08-03",
+      "Venue": "Pollok",
+      "Updated_At": "2026-08-09 22:55",
       "Updated_By": "admin"
     }
   ]
