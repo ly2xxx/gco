@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-08-16T22:23:56.738073",
+  "export_date": "2026-08-16T22:26:12.160354",
   "events": [
     {
       "date": "2026-04-04",
@@ -446,24 +446,6 @@
     },
     {
       "Player": "刘北南",
-      "Tournament": "2026个人联赛",
-      "Game": "Game 6",
-      "Game_No": 6,
-      "Net_Score": 0,
-      "Gross_Score": 0,
-      "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
-      "Eagles": 0,
-      "Stableford": 0,
-      "Date": NaN,
-      "Venue": NaN,
-      "Updated_At": NaN,
-      "Updated_By": NaN
-    },
-    {
-      "Player": "杨子初",
       "Tournament": "2026个人联赛",
       "Game": "Game 6",
       "Game_No": 6,
@@ -1702,6 +1684,24 @@
       "Date": "2026-08-15",
       "Venue": "West Lothian",
       "Updated_At": "2026-08-15 16:10",
+      "Updated_By": "admin"
+    },
+    {
+      "Player": "杨子初",
+      "Tournament": "2026个人联赛",
+      "Game": "Game 6",
+      "Game_No": 6,
+      "Net_Score": -6,
+      "Gross_Score": 99,
+      "Birdies": 0,
+      "Pars": 2,
+      "Bogeys": 7,
+      "Double_Bogeys": 9,
+      "Eagles": 0,
+      "Stableford": 36,
+      "Date": "2026-08-16",
+      "Venue": "Royal Burgess",
+      "Updated_At": "2026-08-16 22:26",
       "Updated_By": "admin"
     }
   ]
