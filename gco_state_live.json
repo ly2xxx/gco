@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-08-16T22:26:12.160354",
+  "export_date": "2026-08-25T07:59:29.521255",
   "events": [
     {
       "date": "2026-04-04",
@@ -290,10 +290,22 @@
         "id": "om4",
         "name": "Outing Day 4: 2-men match play",
         "date": "2026-08-23",
-        "venue": "TBD",
-        "red_score": 0.0,
-        "black_score": 0.0,
-        "status": "upcoming"
+        "venue": "East Renfrewshire",
+        "red_score": 1.0,
+        "black_score": 1.0,
+        "status": "completed",
+        "red_players": [
+          "刘北南",
+          "Justin",
+          "李扬",
+          "赵鲲"
+        ],
+        "black_players": [
+          "Neo",
+          "徐峥",
+          "曹振波",
+          "Jacky"
+        ]
       }
     ],
     "total_points": 8,
