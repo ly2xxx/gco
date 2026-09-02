@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "export_date": "2026-09-02T11:21:29.265676",
+  "export_date": "2026-09-02T11:24:01.319710",
   "events": [
     {
       "date": "2026-04-04",
@@ -1703,17 +1703,17 @@
       "Tournament": "2026个人联赛",
       "Game": "Game 6",
       "Game_No": 6,
-      "Net_Score": 0,
-      "Gross_Score": 72,
+      "Net_Score": 6,
+      "Gross_Score": 97,
       "Birdies": 0,
-      "Pars": 0,
-      "Bogeys": 0,
-      "Double_Bogeys": 0,
+      "Pars": 3,
+      "Bogeys": 6,
+      "Double_Bogeys": 9,
       "Eagles": 0,
       "Stableford": 36,
       "Date": "2026-09-02",
       "Venue": "St Nicholas",
-      "Updated_At": "2026-09-02 11:21",
+      "Updated_At": "2026-09-02 11:24",
       "Updated_By": "admin"
     }
   ]
