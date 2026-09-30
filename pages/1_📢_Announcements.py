@@ -68,7 +68,8 @@ except FileNotFoundError:
 # ── Display existing announcements ────────────────────────────────────────────
 section(st, "📌", "最新公告")
 
-for ann in anns_sorted:
+display_announcements = get_display_announcements(anns_sorted)
+for ann in display_announcements:
     pinned_cls = "pinned" if ann.get("pinned") else ""
     tags_html = "".join(
         f'<span class="gco-pill {"pill-pinned" if t == "重要" else "pill-league"}">{t}</span>'

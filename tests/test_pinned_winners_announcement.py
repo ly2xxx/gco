@@ -244,3 +244,45 @@ def test_get_pinned_winners_announcement_does_not_read_stored_store(load_announc
 
     ann = module.get_pinned_winners_announcement()
     assert ann["id"] == "pinned-2026-season-winners"
+
+
+def test_page_renders_pinned_winners_before_stored(load_announcements_page):
+    """Spec behaviours 1, 2, 11 and the render-path half of 8."""
+    stored = [
+        {
+            "id": "stored-pinned",
+            "title": "STORED PINNED TITLE",
+            "date": "2026-01-01",
+            "author": "Author",
+            "pinned": True,
+            "body": "STORED PINNED BODY",
+            "tags": ["stored"],
+        },
+        {
+            "id": "stored-normal",
+            "title": "STORED NORMAL TITLE",
+            "date": "2026-01-02",
+            "author": "Author",
+            "pinned": False,
+            "body": "STORED NORMAL BODY",
+            "tags": [],
+        },
+    ]
+    before = copy.deepcopy(stored)
+
+    module, log, save_calls = load_announcements_page(stored)
+
+    text = "\n".join(
+        str(value)
+        for name, args, kwargs in log
+        for value in (*args, *kwargs.values())
+    )
+
+    assert "🎉 2026 赛季个人冠军公告" in text
+    assert "张纬" in text and "王文龙" in text
+    assert "STORED PINNED TITLE" in text
+    assert "STORED NORMAL TITLE" in text
+    assert text.index("🎉 2026 赛季个人冠军公告") < text.index("STORED PINNED TITLE")
+    assert text.index("🎉 2026 赛季个人冠军公告") < text.index("STORED NORMAL TITLE")
+    assert stored == before
+    assert save_calls == []
