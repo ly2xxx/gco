@@ -32,11 +32,16 @@ you approve the plan.
    - Under **Deployment protection rules**, check **Required reviewers** and add yourself as a reviewer. Leave **Prevent self-review** unchecked (so you can approve runs triggered by your own actions), then click **Save protection rules**:
 
      ![Configure Required reviewers protection rules](HITL/sdlc-review_hitl.png)
-2. **Settings → Actions → General → Allow GitHub Actions to create and approve
-   pull requests**, or add an `SDLC_PR_TOKEN` secret (a fine-grained token with
-   contents and pull requests write). With the token, CI also runs on the PR.
-   With neither, step 6 fails but prints the pull request's title and body in
-   its log, so it can be opened by hand.
+2. **Settings → Actions → General → Allow GitHub Actions to create and approve pull requests**, or add an `SDLC_PR_TOKEN` secret:
+   - **Option A (Workflow permissions):** In **Settings → Actions → General**, under **Workflow permissions**, check **Allow GitHub Actions to create and approve pull requests** and click **Save**:
+
+     ![Allow GitHub Actions to create and approve pull requests](SDLC_PR_TOKEN/workflow-permissions.png)
+
+   - **Option B (`SDLC_PR_TOKEN` secret):** Create a fine-grained personal access token (under user **Settings → Developer Settings → Personal access tokens → Fine-grained tokens**) with repository permissions for **Pull requests: Read and write** and **Contents: Read-only** (or write), then add it as a repository secret named `SDLC_PR_TOKEN` under **Settings → Secrets and variables → Actions**:
+
+     ![Configure SDLC_PR_TOKEN fine-grained personal access token](SDLC_PR_TOKEN/sdlc-pr-token.png)
+
+     With the token, CI also runs on the PR. With neither, step 6 fails but prints the pull request's title and body in its log, so it can be opened by hand.
 3. `OLLAMA_API_KEY` secret. Optional variables: `OLLAMA_MODEL` (default
    `deepseek-v4-flash:cloud`) and `OLLAMA_THINK` (`false` stops a reasoning
    model thinking for minutes).
