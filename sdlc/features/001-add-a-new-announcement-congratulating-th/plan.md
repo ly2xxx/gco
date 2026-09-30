@@ -1,249 +1,308 @@
-<!-- sdlc stage=plan model=deepseek-v4.1-flash:cloud from=intent.md,spec.md@9779b62 -->
+<!-- sdlc stage=plan model=deepseek-v4.1-flash:cloud from=intent.md,spec.md@db96a2f -->
 ## Approach
-Add one static, module-level announcement dict plus a pure accessor to `pages/1_📢_Announcements.py`, prepend it as the first element of the page's existing announcement collection (rendered by the existing loop, unchanged), and prove it with four offline pytest cases in `test_streamlit_app.py`: the copy contract (names, titles, 2026, 祝贺, no 张维), newest-entry ordering, an unchanged-pre-existing-entries check against a checked-in JSON baseline, and a `streamlit.testing.v1.AppTest` render check.
+Add a fixed display-only 2026 winners announcement and a pure helper in `pages/1_📢_Announcements.py` that prepends it to a copy of the stored list, then make the existing render loop consume that helper while leaving save/delete/import/export paths on the original stored list. Add pytest coverage using a fake Streamlit module so page import is side-effect-free and the render order can be asserted.
 
 ## Coverage
 
 | Done when (intent.md) | Spec behaviours | Phase |
 | :-- | :-- | :-- |
-| The Announcements page displays an announcement announcing the 2026 individual season winners. | 1, 2, 10, 11, 12 | Phase 1, Phase 2, Phase 3 |
-| The announcement names 张纬 as the 个人联赛 winner and 王文龙 as the 个人杯赛 winner. | 2, 3, 4, 5, 6 | Phase 1 |
-| The wording is congratulatory and clearly attributes both honours to the 2026 season. | 7, 8 | Phase 1 |
-| All announcements that already existed on the page remain visible and unchanged. | 10, 11 | Phase 2 |
-| The existing tests still pass. | 13 | Phase 3 |
+| The Announcements page displays the 2026 winners announcement as the first announcement, before all stored announcements. | 1, 2, 11 | Phase 2 |
+| The announcement names 张纬 as the 2026 个人联赛 winner and 王文龙 as the 2026 个人杯赛 winner. | 6, 11 | Phase 1 (body), Phase 2 (render) |
+| The announcement exposes the same fields as stored announcements: id, title, date, author, pinned, body, tags, with pinned true. | 3, 4, 5, 7 | Phase 1 |
+| The announcement is not present in the saved announcements list and does not modify saved announcements. | 8, 9, 10 | Phase 1 (pure helper), Phase 2 (render path) |
+| All announcements that already existed remain visible and unchanged. | 2, 8, 9, 11 | Phase 1 (pass-through), Phase 2 (render includes stored) |
+| The existing tests still pass. | — | Phase 1, Phase 2 (final whole-suite verification) |
 
-## Phase 1: Add the 2026 winners announcement data and accessor
+## Phase 1: Add display-only winners announcement helpers
 <!-- phase: 1 -->
-<!-- targets: pages/1_📢_Announcements.py, test_streamlit_app.py -->
-<!-- frozen: data.py, streamlit_app.py, theme.py, auth.py, features/**, pages/2_📅_Events.py, pages/3_🏆_League.py, pages/4_🥊_Cup.py, pages/5_⛳_Outing.py, pages/6_💾_API_Data.py, pyproject.toml, requirements.txt, uv.lock -->
+<!-- targets: pages/1_📢_Announcements.py, tests/test_pinned_winners_announcement.py -->
+<!-- frozen: test_streamlit_app.py, features/**, data.py, streamlit_app.py, pages/2_📅_Events.py, pages/3_🏆_League.py, pages/4_🥊_Cup.py, pages/5_⛳_Outing.py, pages/6_💾_API_Data.py, gco_state.json, gco_state_live.json, backup/** -->
 
-**Goal:** `pages/1_📢_Announcements.py` exposes a non-empty congratulatory 2026 winners announcement with the exact required copy, and the page still imports.
+**Goal:** The page module exposes the pinned 2026 winners announcement and a pure display-list builder that prepends it without reading or writing stored announcements.
 
 **Changes:**
-- Read (do not modify yet, do not run shell probes) `pages/1_📢_Announcements.py`. Note the name of its module-level announcement collection and how it is rendered; you will need both in Phase 2. Do not rename any existing symbol.
-- `pages/1_📢_Announcements.py`: immediately after the last top-level `import` statement and before the first pre-existing constant/function/render statement, add exactly:
+- `pages/1_📢_Announcements.py`: immediately after the existing import block, add `from typing import Any` if it is not already imported. Then add exactly:
 
 ```python
-SEASON_2026_WINNERS_ANNOUNCEMENT: dict[str, str] = {
-    "title": "🎉 祝贺2026赛季个人赛冠军揭晓",
+PINNED_2026_WINNERS_ANNOUNCEMENT_ID: str = "pinned-2026-season-winners"
+
+PINNED_2026_WINNERS_ANNOUNCEMENT: dict[str, Any] = {
+    "id": PINNED_2026_WINNERS_ANNOUNCEMENT_ID,
+    "title": "🎉 2026 赛季个人冠军公告",
+    "date": "2026-09-15",
+    "author": "GCO 组委会",
+    "pinned": True,
     "body": (
-        "2026赛季个人赛已圆满结束，特此祝贺！\n\n"
-        "- **个人联赛冠军：张纬** — 恭喜张纬在2026赛季个人联赛中一路领先，最终夺冠！\n"
-        "- **个人杯赛冠军：王文龙** — 恭喜王文龙在2026赛季个人杯赛中过关斩将，最终捧杯！\n\n"
-        "祝贺两位冠军，也感谢所有球员在2026赛季的精彩表现！\n"
+        "2026赛季个人荣誉揭晓！\n\n"
+        "恭喜 张纬 获得 2026 个人联赛冠军！\n"
+        "恭喜 王文龙 获得 2026 个人杯赛冠军！\n\n"
+        "感谢所有成员的参与，期待下个赛季再创佳绩！"
     ),
+    "tags": ["2026", "冠军"],
 }
 
 
-def get_season_2026_winners_announcement() -> dict[str, str]:
-    """Return the 2026 individual season-winners announcement.
+def get_pinned_winners_announcement() -> dict[str, Any]:
+    """Return a fresh copy of the 2026 season winners announcement."""
+    announcement = dict(PINNED_2026_WINNERS_ANNOUNCEMENT)
+    announcement["tags"] = list(PINNED_2026_WINNERS_ANNOUNCEMENT["tags"])
+    return announcement
 
-    Returns a dict with exactly the keys "title" and "body", both non-empty str.
-    Pure: performs no Streamlit calls and no file, network, secret or file-system access.
-    """
-    return dict(SEASON_2026_WINNERS_ANNOUNCEMENT)
+
+def get_display_announcements(
+    stored_announcements: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return a new list with the pinned winners announcement first."""
+    return [get_pinned_winners_announcement(), *stored_announcements]
 ```
 
-  Change nothing else in this file: no edits to existing entries, the existing render loop, or any existing symbol name.
-- `test_streamlit_app.py`: add `import importlib.util`, `import re` and `from pathlib import Path` to the existing import block (leave the existing `import sys`, `import os`, `import pytest`, `import pandas as pd` and the `sys.path.append(...)` line untouched). Then append at the end of the file (after the existing `if __name__ == "__main__":` block, which stays exactly as-is):
+- `tests/test_pinned_winners_announcement.py`: create this file. Use a fake `streamlit` module so importing the page does not execute real Streamlit UI or touch real widgets. The fixture must patch `data.load_announcements` to return the test list and `data.save_announcements` to record calls. Use this structure:
 
 ```python
-REPO_ROOT = Path(__file__).resolve().parent
-ANNOUNCEMENTS_PAGE_PATH = REPO_ROOT / "pages" / "1_📢_Announcements.py"
+from __future__ import annotations
+
+import copy
+import importlib.util
+import pathlib
+import sys
+import types
+from typing import Any
+
+import pytest
+
+PAGE_PATH = pathlib.Path(__file__).resolve().parents[1] / "pages" / "1_📢_Announcements.py"
 
 
-@pytest.fixture(scope="module")
-def announcements_page():
-    """Import pages/1_📢_Announcements.py as a module without starting Streamlit."""
-    spec = importlib.util.spec_from_file_location("gco_announcements_page", ANNOUNCEMENTS_PAGE_PATH)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
+class _SessionState(dict):
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return self[name]
+        except KeyError as exc:
+            raise AttributeError(name) from exc
+
+    def __setattr__(self, name: str, value: Any) -> None:
+        self[name] = value
 
 
-def test_2026_season_winners_announcement_names_both_winners(announcements_page) -> None:
-    """Spec behaviours 1-9: accessor contract and the exact winner copy."""
-    announcement = announcements_page.get_season_2026_winners_announcement()
+class _Recorder:
+    def __init__(self, name: str, log: list[tuple[str, tuple[Any, ...], dict[str, Any]]]):
+        self.name = name
+        self.log = log
 
-    # Behaviour 1: exactly two keys, both non-empty strings.
-    assert set(announcement) == {"title", "body"}
-    assert isinstance(announcement["title"], str) and announcement["title"].strip() != ""
-    assert isinstance(announcement["body"], str) and announcement["body"].strip() != ""
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        self.log.append((self.name, args, kwargs))
+        leaf = self.name.rsplit(".", 1)[-1]
+        if leaf in {"button", "form_submit_button", "download_button", "link_button", "checkbox", "toggle"}:
+            return False
+        if leaf in {"text_input", "text_area"}:
+            return ""
+        if leaf == "number_input":
+            return 0
+        if leaf in {"selectbox", "radio"}:
+            if args and isinstance(args[0], (list, tuple)) and args[0]:
+                return args[0][0]
+            if args and isinstance(args[0], dict) and args[0]:
+                return next(iter(args[0]))
+            return None
+        if leaf == "multiselect":
+            return []
+        if leaf == "slider":
+            if len(args) >= 3:
+                return args[1]
+            return 0
+        if leaf == "date_input":
+            import datetime
+            return datetime.date(2026, 9, 15)
+        if leaf == "file_uploader":
+            return None
+        if leaf == "color_picker":
+            return "#000000"
+        return self
 
-    # The constant is the single source of truth; the accessor hands back a copy.
-    assert announcement == announcements_page.SEASON_2026_WINNERS_ANNOUNCEMENT
-    announcement["title"] = "mutated"
-    assert announcements_page.SEASON_2026_WINNERS_ANNOUNCEMENT["title"] == "🎉 祝贺2026赛季个人赛冠军揭晓"
-    announcement = announcements_page.get_season_2026_winners_announcement()
+    def __enter__(self) -> "_Recorder":
+        return self
 
-    text = announcement["title"] + "\n" + announcement["body"]
+    def __exit__(self, exc_type: Any, exc: Any, tb: Any) -> bool:
+        return False
 
-    # Behaviours 2-5, 7, 8.
-    for required in ("张纬", "个人联赛", "王文龙", "个人杯赛", "2026", "祝贺"):
-        assert required in text, f"missing {required!r} in {text!r}"
+    def __iter__(self):
+        return iter(())
 
-    # Behaviour 9.
-    assert "张维" not in text
+    def __getitem__(self, item: Any) -> "_Recorder":
+        return _Recorder(f"{self.name}[{item!r}]", self.log)
 
-    # Behaviour 6: every clause naming a winner also names that winner's title.
-    segments = [s for s in re.split(r"[\n。！？；!?;]+", text) if s.strip()]
-    zhang_clauses = [s for s in segments if "张纬" in s]
-    wang_clauses = [s for s in segments if "王文龙" in s]
-    assert zhang_clauses, "no clause names 张纬"
-    assert wang_clauses, "no clause names 王文龙"
-    assert all("个人联赛" in s for s in zhang_clauses)
-    assert all("个人杯赛" in s for s in wang_clauses)
+    def __getattr__(self, name: str) -> "_Recorder":
+        return _Recorder(f"{self.name}.{name}", self.log)
+
+
+def _cache_decorator(*args: Any, **kwargs: Any):
+    if len(args) == 1 and callable(args[0]) and not kwargs:
+        return args[0]
+
+    def decorator(func):
+        return func
+
+    return decorator
+
+
+class _FakeStreamlit(types.ModuleType):
+    def __init__(self, log: list[tuple[str, tuple[Any, ...], dict[str, Any]]]):
+        super().__init__("streamlit")
+        self.log = log
+        self.session_state = _SessionState()
+        self.secrets: dict[str, Any] = {}
+
+    def _columns(self, spec: Any) -> list[_Recorder]:
+        n = spec if isinstance(spec, int) else len(spec)
+        return [_Recorder(f"st.column[{i}]", self.log) for i in range(n)]
+
+    def _tabs(self, labels: list[str]) -> list[_Recorder]:
+        return [_Recorder(f"st.tab[{label}]", self.log) for label in labels]
+
+    def __getattr__(self, name: str) -> Any:
+        if name in {"cache_data", "cache_resource", "experimental_memo", "experimental_singleton"}:
+            return _cache_decorator
+        if name == "columns":
+            return self._columns
+        if name == "tabs":
+            return self._tabs
+        if name == "sidebar":
+            return _Recorder("st.sidebar", self.log)
+        return _Recorder(f"st.{name}", self.log)
+
+
+@pytest.fixture
+def load_announcements_page(monkeypatch):
+    loaded: list[str] = []
+    save_calls: list[list[dict[str, Any]]] = []
+
+    def _load(stored_announcements: list[dict[str, Any]] | None = None):
+        log: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = []
+        fake_st = _FakeStreamlit(log)
+        monkeypatch.setitem(sys.modules, "streamlit", fake_st)
+        import data
+
+        stored = [] if stored_announcements is None else stored_announcements
+        monkeypatch.setattr(data, "load_announcements", lambda: stored)
+        monkeypatch.setattr(data, "save_announcements", lambda anns: save_calls.append(anns))
+
+        module_name = f"announcements_page_under_test_{len(loaded)}"
+        loaded.append(module_name)
+        spec = importlib.util.spec_from_file_location(module_name, PAGE_PATH)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module, log, save_calls
+
+    yield _load
+    for module_name in loaded:
+        sys.modules.pop(module_name, None)
 ```
 
+Add these tests in the same file:
+- `test_pinned_announcement_has_exact_fields`: call `module.get_pinned_winners_announcement()`. Assert `set(ann) == {"id", "title", "date", "author", "pinned", "body", "tags"}`. Assert `ann["id"] == "pinned-2026-season-winners"`. Assert `ann["pinned"] is True`. Assert `"张纬" in ann["body"] and "个人联赛" in ann["body"]`. Assert `"王文龙" in ann["body"] and "个人杯赛" in ann["body"]`. Assert `isinstance(ann["title"], str) and ann["title"]`, same for `date`, `author`, `body`. Assert `isinstance(ann["tags"], list) and all(isinstance(t, str) for t in ann["tags"])`.
+- `test_get_pinned_winners_announcement_returns_fresh_copy`: call the accessor twice. Assert equal values, `is not` identity. Append `"mutated"` to `first["tags"]`; assert `"mutated" not in module.PINNED_2026_WINNERS_ANNOUNCEMENT["tags"]` and `"mutated" not in module.get_pinned_winners_announcement()["tags"]`.
+- `test_get_display_announcements_empty`: call `module.get_display_announcements([])`. Assert length `1` and `result[0] == module.get_pinned_winners_announcement()`.
+- `test_get_display_announcements_pins_first_before_stored_pinned`: use two stored dicts, the first with `"pinned": True`. Deepcopy before. Call helper. Assert `[a["id"] for a in result] == ["pinned-2026-season-winners", "s1", "s2"]`. Assert stored equals the deepcopy.
+- `test_get_display_announcements_passes_through_missing_fields`: stored entry with `"author": None`, `"date": None`, `"tags": None`. Call helper. Assert length `2` and `result[1] == stored[0]` and `result[1] is stored[0]`.
+- `test_get_pinned_winners_announcement_does_not_read_stored_store`: use `monkeypatch.setattr(data, "load_announcements", fail)` where `fail` raises `AssertionError("stored announcements store was read")`. Call `module.get_pinned_winners_announcement()` and assert `id`.
+
 **Definition of done:**
-- [ ] `test_streamlit_app.py::test_2026_season_winners_announcement_names_both_winners`: proves spec behaviours 1–9 (two non-empty string keys, the accessor returns a copy of the constant, `张纬`+`个人联赛` and `王文龙`+`个人杯赛` appear in the same clause, `2026` and `祝贺` present, `张维` absent). Pure in-process pytest, no fixture teardown needed beyond the module-scoped import fixture.
-- [ ] `pages/1_📢_Announcements.py` still imports cleanly under that fixture (existing announcements and render code untouched).
-- [ ] No new dependency is added.
+- [ ] `tests/test_pinned_winners_announcement.py::test_pinned_announcement_has_exact_fields`: proves spec behaviours 3, 4, 5, 6, 7.
+- [ ] `tests/test_pinned_winners_announcement.py::test_get_pinned_winners_announcement_returns_fresh_copy`: proves the accessor returns a copy and does not expose the constant’s mutable `tags`.
+- [ ] `tests/test_pinned_winners_announcement.py::test_get_display_announcements_empty`: proves spec behaviour 1.
+- [ ] `tests/test_pinned_winners_announcement.py::test_get_display_announcements_pins_first_before_stored_pinned`: proves spec behaviour 2.
+- [ ] `tests/test_pinned_winners_announcement.py::test_get_display_announcements_passes_through_missing_fields`: proves spec behaviour 9.
+- [ ] `tests/test_pinned_winners_announcement.py::test_get_pinned_winners_announcement_does_not_read_stored_store`: proves spec behaviour 10.
+- [ ] `tests/test_pinned_winners_announcement.py::test_get_display_announcements_does_not_mutate_stored` is not required as a separate name because the deepcopy assertion in `test_get_display_announcements_pins_first_before_stored_pinned` proves spec behaviour 8.
+- [ ] Teardown: the fixture removes every loaded page module from `sys.modules`; `monkeypatch` restores `data.load_announcements`, `data.save_announcements`, and `sys.modules["streamlit"]` automatically.
 
 **Verify:**
 ```bash
-uv run pytest "test_streamlit_app.py::test_2026_season_winners_announcement_names_both_winners" -v
+uv run pytest tests/test_pinned_winners_announcement.py -v
 ```
 
 **Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
 
-## Phase 2: Prepend the announcement and prove existing entries are unchanged
+## Phase 2: Render pinned announcement first
 <!-- phase: 2 -->
-<!-- targets: pages/1_📢_Announcements.py, test_streamlit_app.py, tests/fixtures/announcements_before_2026_winners.json -->
-<!-- frozen: data.py, streamlit_app.py, theme.py, auth.py, features/**, pages/2_📅_Events.py, pages/3_🏆_League.py, pages/4_🥊_Cup.py, pages/5_⛳_Outing.py, pages/6_💾_API_Data.py, pyproject.toml, requirements.txt, uv.lock -->
+<!-- targets: pages/1_📢_Announcements.py, tests/test_pinned_winners_announcement.py -->
+<!-- frozen: test_streamlit_app.py, features/**, data.py, streamlit_app.py, pages/2_📅_Events.py, pages/3_🏆_League.py, pages/4_🥊_Cup.py, pages/5_⛳_Outing.py, pages/6_💾_API_Data.py, gco_state.json, gco_state_live.json, backup/** -->
 
-**Goal:** The new announcement is the first element of the page's announcement collection, every pre-existing entry is byte-for-byte unchanged, and the collection is exactly one entry longer.
+**Goal:** The Announcements page render loop obtains its items from `get_display_announcements(...)`, so the pinned winner appears above every stored announcement and no save/delete path sees the display list.
 
 **Changes:**
-- Read `pages/1_📢_Announcements.py` and resolve the placeholder `<COLLECTION_NAME>` below to the real module-level announcement collection name (the list of `{"title": ..., "body": ...}` dicts that the page renders). Never rename or shadow an existing symbol.
-- `pages/1_📢_Announcements.py`: prepend `SEASON_2026_WINNERS_ANNOUNCEMENT` as the new index-0 element of `<COLLECTION_NAME>`.
-  - If `<COLLECTION_NAME>` is assigned a list literal, insert the bare name `SEASON_2026_WINNERS_ANNOUNCEMENT` as the first element of that literal.
-  - If it is assigned an expression (for example a loader call), change the assignment to `COLLECTION_NAME = [SEASON_2026_WINNERS_ANNOUNCEMENT, *<EXISTING EXPRESSION>]` — never mutate the source list in place.
-  - Keep every pre-existing entry's exact `title` and `body` text and its relative order. Add no new keys (no `date`, no `id`) to any entry.
-  - Change nothing else: the existing render path is reused verbatim and is not edited.
-- `tests/fixtures/announcements_before_2026_winners.json` (new file): a JSON array containing one object per pre-existing announcement, in the same order they appear in `<COLLECTION_NAME>` before the prepend, each object with exactly the keys `"title"` and `"body"` and the exact original string values (emoji, Chinese punctuation, `\n` escapes and trailing spaces preserved). Write it UTF-8, `ensure_ascii=False`, two-space indent, trailing newline. Transcribe it by reading the file — never by running a shell command.
-- `test_streamlit_app.py`: add `import json` to the existing import block, and append after the Phase 1 test:
+- `pages/1_📢_Announcements.py`: locate the render loop that consumes the stored announcements list. Introduce `display_announcements = get_display_announcements(stored_announcements)` immediately before that loop and use `display_announcements` only as the loop iterable. Leave the original stored list variable unchanged for save/create/delete/import/export. Do not change the loop body. If the existing code sorts or filters stored announcements before rendering, call `get_display_announcements` after that sort/filter so the pinned synthetic announcement is still prepended to the final render list. Do not add new styling, badges, or layout behaviour.
+- `tests/test_pinned_winners_announcement.py`: add `test_page_renders_pinned_winners_before_stored`. Use `load_announcements_page` with a stored list containing one pinned stored announcement and one non-pinned stored announcement:
 
 ```python
-ANNOUNCEMENTS_BASELINE_PATH = REPO_ROOT / "tests" / "fixtures" / "announcements_before_2026_winners.json"
-
-
-def _page_announcements(page):
-    """The page's module-level announcement collection, in render order."""
-    return page.<COLLECTION_NAME>
-
-
-def test_2026_season_winners_announcement_is_newest_entry(announcements_page) -> None:
-    """Spec behaviour 10: the 2026 winners announcement renders first."""
-    collection = _page_announcements(announcements_page)
-    assert isinstance(collection, list)
-    assert len(collection) >= 1
-    assert collection[0] == announcements_page.get_season_2026_winners_announcement()
-
-
-def test_existing_announcements_are_unchanged(announcements_page) -> None:
-    """Spec behaviour 11: exactly one entry added, all previous entries intact."""
-    collection = _page_announcements(announcements_page)
-    expected = json.loads(ANNOUNCEMENTS_BASELINE_PATH.read_text(encoding="utf-8"))
-    assert isinstance(expected, list) and expected
-
-    assert len(collection) == len(expected) + 1
-    assert collection[1:] == expected
-
-    pairs = [(entry["title"], entry["body"]) for entry in collection[1:]]
-    assert len(pairs) == len(set(pairs))
-
-
-def test_announcements_baseline_matches_page_history(announcements_page) -> None:
-    """The baseline file is a faithful copy, not a hand-trimmed subset."""
-    expected = json.loads(ANNOUNCEMENTS_BASELINE_PATH.read_text(encoding="utf-8"))
-    assert all(set(entry) == {"title", "body"} for entry in expected)
-    assert all(entry["title"].strip() != "" and entry["body"].strip() != "" for entry in expected)
+stored = [
+    {
+        "id": "stored-pinned",
+        "title": "STORED PINNED TITLE",
+        "date": "2026-01-01",
+        "author": "Author",
+        "pinned": True,
+        "body": "STORED PINNED BODY",
+        "tags": ["stored"],
+    },
+    {
+        "id": "stored-normal",
+        "title": "STORED NORMAL TITLE",
+        "date": "2026-01-02",
+        "author": "Author",
+        "pinned": False,
+        "body": "STORED NORMAL BODY",
+        "tags": [],
+    },
+]
 ```
 
+In the test:
+- `before = copy.deepcopy(stored)`.
+- `module, log, save_calls = load_announcements_page(stored)`.
+- Flatten the fake Streamlit log to one text string:
+
+```python
+text = "\n".join(
+    str(value)
+    for name, args, kwargs in log
+    for value in (*args, *kwargs.values())
+)
+```
+
+- Assert `"🎉 2026 赛季个人冠军公告" in text`.
+- Assert `"张纬" in text and "王文龙" in text`.
+- Assert `"STORED PINNED TITLE" in text` and `"STORED NORMAL TITLE" in text`.
+- Assert `text.index("🎉 2026 赛季个人冠军公告") < text.index("STORED PINNED TITLE")`.
+- Assert `text.index("🎉 2026 赛季个人冠军公告") < text.index("STORED NORMAL TITLE")`.
+- Assert `stored == before`.
+- Assert `save_calls == []`.
+
 **Definition of done:**
-- [ ] `test_streamlit_app.py::test_2026_season_winners_announcement_is_newest_entry`: proves spec behaviour 10 — `collection[0]` equals `get_season_2026_winners_announcement()`.
-- [ ] `test_streamlit_app.py::test_existing_announcements_are_unchanged`: proves spec behaviour 11 — `len(collection) == len(baseline) + 1`, `collection[1:] == baseline` (identical `title`/`body`, same order), and every `(title, body)` pair appears exactly once.
-- [ ] `test_streamlit_app.py::test_announcements_baseline_matches_page_history`: proves the checked-in baseline is well-formed and non-empty, so the unchanged check is meaningful.
-- [ ] The diff to `pages/1_📢_Announcements.py` contains only the two new Phase 1 symbols and the one prepended list element.
+- [ ] `tests/test_pinned_winners_announcement.py::test_page_renders_pinned_winners_before_stored`: proves spec behaviours 1, 2, 11 and the render-path half of spec behaviour 8. The fake Streamlit fixture is torn down via `monkeypatch` and the loaded module name is removed from `sys.modules` in the fixture finalizer.
 
 **Verify:**
 ```bash
-uv run pytest "test_streamlit_app.py::test_2026_season_winners_announcement_is_newest_entry" "test_streamlit_app.py::test_existing_announcements_are_unchanged" "test_streamlit_app.py::test_announcements_baseline_matches_page_history" -v
-```
-
-**Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
-
-## Phase 3: Prove the rendered page shows the new announcement
-<!-- phase: 3 -->
-<!-- targets: test_streamlit_app.py, pages/1_📢_Announcements.py -->
-<!-- frozen: data.py, streamlit_app.py, theme.py, auth.py, features/**, pages/2_📅_Events.py, pages/3_🏆_League.py, pages/4_🥊_Cup.py, pages/5_⛳_Outing.py, pages/6_💾_API_Data.py, pyproject.toml, requirements.txt, uv.lock, tests/fixtures/announcements_before_2026_winners.json -->
-
-**Goal:** Running the Announcements page through `AppTest` offline renders the new announcement's title and every non-empty body line, with no change to the render path.
-
-**Changes:**
-- `test_streamlit_app.py`: append at the end of the file:
-
-```python
-def _rendered_text(at) -> str:
-    """All text the running page emitted, across the element types it can use."""
-    parts: list[str] = []
-    for name in ("markdown", "subheader", "header", "title", "caption", "text"):
-        for element in getattr(at, name, []):
-            parts.append(str(getattr(element, "value", "")))
-    for element in getattr(at, "expander", []):
-        parts.append(str(getattr(element, "label", "")))
-    return "\n".join(parts)
-
-
-def test_announcements_page_includes_2026_season_winners(announcements_page) -> None:
-    """Spec behaviour 12: the page renders the announcement offline."""
-    from streamlit.testing.v1 import AppTest
-
-    at = AppTest.from_file(str(ANNOUNCEMENTS_PAGE_PATH), default_timeout=30).run()
-    announcement = announcements_page.get_season_2026_winners_announcement()
-    rendered = _rendered_text(at)
-    exceptions = [str(getattr(e, "value", e)) for e in at.exception]
-
-    assert announcement["title"] in rendered, f"title not rendered; exceptions={exceptions}; rendered={rendered!r}"
-    for line in announcement["body"].splitlines():
-        stripped = line.strip()
-        if stripped:
-            assert stripped in rendered, f"line {stripped!r} not rendered; exceptions={exceptions}; rendered={rendered!r}"
-```
-
-- `pages/1_📢_Announcements.py`: default change is none. Only if the assertion above fails because the title is rendered through an element type not covered by `_rendered_text`, extend `_rendered_text` in `test_streamlit_app.py` to include that element collection (reading its `.value` or `.label`). Do not alter the page's render path.
-- No new dependency: `streamlit.testing.v1` ships with the already-declared `streamlit` dependency.
-
-**Definition of done:**
-- [ ] `test_streamlit_app.py::test_announcements_page_includes_2026_season_winners`: proves spec behaviour 12 — `AppTest.from_file("pages/1_📢_Announcements.py").run()` with no network renders the announcement title and every non-empty body line (title, `个人联赛冠军：张纬`, `个人杯赛冠军：王文龙`, and the `祝贺` lines).
-- [ ] `uv run pytest test_streamlit_app.py -v` passes with all pre-existing tests plus the three new ones — proving spec behaviour 13 (the existing suite still passes unchanged).
-- [ ] The page render path is unmodified: the loop over `<COLLECTION_NAME>` is byte-identical to the approved tag's version.
-
-**Verify:**
-```bash
-uv run pytest test_streamlit_app.py -v
+uv run pytest tests/test_pinned_winners_announcement.py -v
 ```
 
 **Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
 
 ## Risks
-- The approved documents do not show the page's real collection name or its current copy; a wrong guess breaks Phase 2 — caught by `test_existing_announcements_are_unchanged` and by the import in Phase 1/2.
-- `pages/1_📢_Announcements.py` may run Streamlit or network code at import time; in a bare pytest process that mostly no-ops, but a `st.session_state`/secrets/network failure surfaces as a Phase 1 or Phase 2 import error. Phase 3 shows whether the page truly renders offline.
-- The page might gate on auth or a data source; if so, Phase 3's `AppTest` check fails and the plan must be revised (changing auth is out of scope), rather than loosening the test.
-- The render path might emit the title through an element type `_rendered_text` does not collect; Phase 3 catches it and the collector is extended, not the page.
-- Transcribing the baseline JSON by hand can introduce copy drift; Phase 2's exact-equality assertions catch it and the builder re-copies from the file (within the attempt budget).
-- Mixing up `张纬` and `张维`; Phase 1's `"张维" not in text` assertion and the `张纬` presence check catch it.
+- The fake Streamlit fixture may not implement every API the page calls. Phase 2’s page-import/render test would fail with `AttributeError` or missing text. Extend the fake fixture’s no-op/default return values; do not change page behaviour to satisfy the fake.
+- The page may already sort or filter stored announcements. Phase 2 asserts only winner-before-stored and stored visibility; Phase 1 asserts prepend order in the helper. If the page sorts after prepending, Phase 2 catches it when a stored pinned title moves above the winner title.
+- The page filename contains emoji. Phase 1’s `PAGE_PATH` uses the exact literal path `pages/1_📢_Announcements.py`; a mismatch fails collection.
+- The page could accidentally pass the display list to save/delete/import/export. Phase 2 records `save_announcements` calls and asserts none during render; the final whole-suite run catches persisted changes.
+- Importing the page module executes its top-level Streamlit code. The fake module prevents real side effects in the targeted tests; the pipeline’s final `python -m pytest -q && behave --format progress` catches real-environment regressions.
 
 ## Open questions
-- The real name of the module-level announcement collection and the exact pre-existing copy are not in the approved documents. Assumption: the builder resolves both by reading `pages/1_📢_Announcements.py` (a read, not an exploratory shell probe) and uses the real name wherever this plan writes `<COLLECTION_NAME>`.
-- Whether the collection is a literal or a loader expression is unknown. Assumption: prepend via a list literal if it is a literal, otherwise `[SEASON_2026_WINNERS_ANNOUNCEMENT, *<EXISTING EXPRESSION>]`; never mutate in place.
-- `streamlit.testing.v1.AppTest` (streamlit ≥ 1.28) is assumed importable. If it is not, stop at Phase 3 and revise the plan: adding or upgrading dependencies is out of scope for the spec.
-- The intent's 张纬 vs the scorecard 张维 is left unresolved by design; the announcement uses 张纬 and nothing else in the repository is touched.
+None. The spec resolves the intent’s open questions; this plan implements those exact values: 张纬 spelling, title `🎉 2026 赛季个人冠军公告`, date `2026-09-15`, author `GCO 组委会`, id `pinned-2026-season-winners`, tags `["2026", "冠军"]`.
 
 ## Hand back
 When every phase is built and its Verify block passes:
 1. Create `sdlc/features/001-add-a-new-announcement-congratulating-th/build-log.md` with one section per phase, in order. Head each one `## Phase <n>: <title>`, then list the files changed, the Verify command you ran and its result, and any deviation from this plan (or "none").
 2. Commit it and push it to `feature/001-add-a-new-announcement-congratulating-th`.
+
+The pipeline waits for this file. Once it has a section for every phase, it verifies the whole branch and opens the pull request.
