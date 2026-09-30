@@ -30,3 +30,19 @@
 - Added two small helpers to the test module: `_record()` builds the sample records with the required keys the plan asks for ("plus the required keys"), and `_calls_helper()` is the `ast.Call` check used by `test_home_page_calls_the_shared_helper` (and by the Phase 3 test for the Announcements page).
 - The plan's Goal says the 最新动态 block "still shows the same two announcements as before". It assumed the home page already had its own pinned copy; it did not, so the block now shows the two pinned records instead of the first two stored announcements. That is the change the feature exists for (the home page matching the Announcements page), so it stands.
 - `streamlit_app.py` had no pinned list or local `get_display_announcements` to delete; the call site is new, placed on the existing `[:2]` line.
+
+## Phase 3: Announcements page uses the shared selector and uniqueness is proven
+**Status:** done. **Builder:** Claude Code (sdlc-github skill).
+**Files changed:** `pages/1_📢_Announcements.py`, `tests/test_announcement_page_wiring.py`.
+
+`pages/1_📢_Announcements.py` no longer defines the two pinned record literals, `PINNED_2026_WINNERS_ANNOUNCEMENT_ID` or its own `get_display_announcements`; it imports `PINNED_ANNOUNCEMENTS` and `get_display_announcements` from `pinned_announcements`, and its existing `get_display_announcements(anns_sorted)` call now uses the shared one (render path, cap and markup unchanged). The wiring test module gains the plan's five Phase 3 tests; `tests/test_pinned_winners_announcement.py` had no page-source assertion or relocated import to update, so it is unchanged and all its tests still pass.
+
+- `uv run pytest tests/test_announcement_page_wiring.py tests/test_pinned_announcements.py tests/test_pinned_winners_announcement.py -v` (Phase 3 Verify, first command): exit 0, 30 passed.
+- `test -z "$(grep -n 'def get_display_announcements' streamlit_app.py 'pages/1_📢_Announcements.py' || true)"` (second command): exit 0.
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 003-front-page-in-streamlit-app-py --phase 3`: exit 0, PASSED (scope all inside the targets, no frozen file touched, contract matches; Phase 1-3 Verify passed; pytest 35 passed, behave 17 scenarios passed).
+- `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=.venv` (CI's fatal lint): 0, exit 0.
+- Extra check, not in the plan and not committed: `streamlit.testing.v1.AppTest` with the repository's data renders, with no exception, the home page 最新动态 as `📌 🎉 2026 赛季个人冠军公告`, `📌 🎉 2026 Outing Day 对抗赛结果公告`, and the Announcements page as those two followed by `📌 🏌️ 2026赛季正式开幕！`, `📋 个人杯赛抽签结果公布`.
+
+**Deviations:**
+- The page keeps `PINNED_2026_WINNERS_ANNOUNCEMENT`, `PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT`, `get_pinned_winners_announcement()` and `get_pinned_outing_day_result_announcement()`, now bound to the shared records (`PINNED_2026_WINNERS_ANNOUNCEMENT, PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT = PINNED_ANNOUNCEMENTS`) rather than defining them. The plan requires `tests/test_pinned_winners_announcement.py`'s other assertions to keep passing, and 15 of them read those names from the page module (they come from features 001 and 002), while `pinned_announcements.py` is frozen with the plan's exact content, which has no named records or copy accessors. Keeping thin views on the page satisfies both without redefining any record, copying the selector or weakening a test; the page still imports `get_display_announcements` and defines no pinned literal, as the Phase 3 tests check. The page imports `PINNED_ANNOUNCEMENTS` as well as `get_display_announcements` for these views.
+- `_calls_helper()` from Phase 2 backs `test_announcements_page_calls_the_shared_helper`, and `_record()` builds `test_both_pages_share_one_pinned_sequence`'s extra records with the required keys.

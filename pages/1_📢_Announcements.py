@@ -7,39 +7,11 @@ from datetime import date
 from theme import inject_theme, hero, section, flash, show_flash, sync_status
 from data import load_announcements, save_announcements
 from auth import is_admin_user
+from pinned_announcements import PINNED_ANNOUNCEMENTS, get_display_announcements
 from typing import Any
 
-PINNED_2026_WINNERS_ANNOUNCEMENT_ID: str = "pinned-2026-season-winners"
-
-PINNED_2026_WINNERS_ANNOUNCEMENT: dict[str, Any] = {
-    "id": PINNED_2026_WINNERS_ANNOUNCEMENT_ID,
-    "title": "🎉 2026 赛季个人冠军公告",
-    "date": "2026-09-15",
-    "author": "GCO 组委会",
-    "pinned": True,
-    "body": (
-        "2026赛季个人荣誉揭晓！\n\n"
-        "恭喜 张纬 获得 2026 个人联赛冠军！\n"
-        "恭喜 王文龙 获得 2026 个人杯赛冠军！\n\n"
-        "感谢所有成员的参与，期待下个赛季再创佳绩！"
-    ),
-    "tags": ["2026", "冠军"],
-}
-
-PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT: dict[str, Any] = {
-    "id": "pinned-2026-outing-day-result",
-    "title": "🎉 2026 Outing Day 对抗赛结果公告",
-    "date": "2026-08-16",
-    "author": PINNED_2026_WINNERS_ANNOUNCEMENT["author"],
-    "pinned": True,
-    "body": (
-        "🏌️ Outing Day 对抗赛结果\n"
-        "\n"
-        "红队 Red Team 5.0 pts 战胜 黑队 Black Team 3.0 pts\n"
-        "红队阵容：刘北南 • 李扬 • 赵鲲 • 张纬 • Justin • 曾诚"
-    ),
-    "tags": ["Outing Day", "对抗赛"],
-}
+# Named views of the shared pinned records, which are defined once in pinned_announcements.py.
+PINNED_2026_WINNERS_ANNOUNCEMENT, PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT = PINNED_ANNOUNCEMENTS
 
 
 def get_pinned_winners_announcement() -> dict[str, Any]:
@@ -52,17 +24,6 @@ def get_pinned_winners_announcement() -> dict[str, Any]:
 def get_pinned_outing_day_result_announcement() -> dict[str, Any]:
     """Return a fresh deep copy of PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT."""
     return copy.deepcopy(PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT)
-
-
-def get_display_announcements(
-    stored_announcements: list[dict[str, Any]],
-) -> list[dict[str, Any]]:
-    """Return [pinned winners announcement, pinned outing day result announcement, *stored_announcements]."""
-    return [
-        get_pinned_winners_announcement(),
-        get_pinned_outing_day_result_announcement(),
-        *stored_announcements,
-    ]
 
 
 st.set_page_config(page_title="GCO | 公告", page_icon="📢", layout="wide")
