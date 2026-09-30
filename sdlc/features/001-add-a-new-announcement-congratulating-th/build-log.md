@@ -14,3 +14,16 @@
 **Deviations:**
 - The fixture adds `monkeypatch.syspath_prepend(str(PAGE_PATH.parents[1]))` before `import data`. The Verify block runs `uv run pytest tests/...`, whose sys.path holds `tests/` but not the repository root where `data.py`, `theme.py` and `auth.py` live, so the plan's fixture could not import them. It stands because it is the same fix the existing `test_streamlit_app.py` uses (`sys.path.append(...)`), scoped to the test by `monkeypatch`, and changes no page behaviour.
 - Checker bug outside the plan: `sdlc_stage.py` reads `git diff --name-only` and `git ls-files` with git's default `core.quotePath=true`, so a non-ASCII target such as `pages/1_📢_Announcements.py` is reported as an octal-escaped path outside the targets. The fix belongs in `ly2xxx/.github` (`git()` helper passes `-c core.quotePath=false`), not in this feature's targets; the owner committed it there as `e924f2e`. Nothing in this repository changed for it.
+
+## Phase 2: Render pinned announcement first
+**Status:** done. **Builder:** Claude Code (sdlc-github skill).
+**Files changed:** `pages/1_📢_Announcements.py`, `tests/test_pinned_winners_announcement.py`.
+
+The render loop now iterates `display_announcements = get_display_announcements(anns_sorted)`, built after the page's existing pinned/date sort, so the winners announcement is prepended to the final render list; the loop body, the stored `anns` list and every save/edit/delete path are unchanged. `test_page_renders_pinned_winners_before_stored` loads the page with the plan's two stored announcements and asserts the winners title renders before both stored titles, the stored list is unmodified and nothing is saved.
+
+- `uv run pytest tests/test_pinned_winners_announcement.py -v` (Phase 2 Verify): exit 0, 7 passed.
+- The new render test fails against the Phase 1 page (`assert '🎉 2026 赛季个人冠军公告' in ...`, 1 failed) and passes with the change, so it tests the render path.
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 001-add-a-new-announcement-congratulating-th --phase 2`: exit 0, PASSED (scope all inside the targets, no frozen file touched, contract matches; Phase 1 and Phase 2 Verify passed; pytest 12 passed, behave 17 scenarios passed).
+- Extra check, not in the plan and not committed: `streamlit.testing.v1.AppTest.from_file("pages/1_📢_Announcements.py").run()` with the repository's data renders 3 announcement cards in this order, with no exception: `📌 🎉 2026 赛季个人冠军公告`, `📌 🏌️ 2026赛季正式开幕！`, `📋 个人杯赛抽签结果公布`.
+
+**Deviations:** none.
