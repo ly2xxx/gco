@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   phase:
-    uses: ly2xxx/.github/.github/workflows/sdlc-phase.yml@v1
+    uses: ly2xxx/.github/.github/workflows/sdlc-phase.yml@main
     with:
       install-command: uv pip install -r requirements.txt
       test-command: python -m pytest -q && behave --format progress
