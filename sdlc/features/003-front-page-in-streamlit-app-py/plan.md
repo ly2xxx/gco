@@ -1,25 +1,22 @@
 <!-- sdlc stage=plan model=deepseek-v4.1-flash:cloud from=intent.md,spec.md@ea50231 -->
-
 ## Approach
 
 Create one new module `pinned_announcements.py` that holds the pinned announcement records (copied byte-identically from the copies currently in `streamlit_app.py` and `pages/1_📢_Announcements.py`) plus a single `get_display_announcements(announcements=None)` selector, then delete the two page-local copies and have both pages import the shared helper, keeping each page's own `[:2]` cap and body truncation at the call site. Phase 1 adds and unit-tests the module while both pages keep working as they do today; Phase 2 rewires the home page; Phase 3 rewires the Announcements page and proves by parsing every application file that the records and the helper now exist in exactly one place, and that both pages derive the same pinned sequence for the same data.
 
 ## Coverage
 
-| Done when (intent.md)                                                                                                                                                                              | Spec behaviours       | Phase                                                               |
-| :------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :-------------------- | :------------------------------------------------------------------ |
-| The pinned announcement records are defined in exactly one place in the codebase, and that place is`pinned_announcements.py`.                                                                    | 1, 2                  | 1 (module created) and 3 (duplicates removed and uniqueness proven) |
-| `get_display_announcements()` is defined in exactly one place, is importable from `pinned_announcements.py`, and is imported by both `streamlit_app.py` and `pages/1_📢_Announcements.py`. | 1, 2, 3, 4            | 1 (defined) and 2, 3 (imported by both pages)                       |
-| Neither page contains a local pinned-records definition or a local copy of the display-selection logic.                                                                                            | 3, 4                  | 2 (home page) and 3 (Announcements page)                            |
-| For the same underlying announcement data, the home page's 最新动态 block and the Announcements page surface the same pinned announcements in the same order.                                      | 5, 6, 7, 8, 9, 10, 11 | 1 (ordering contract) and 3 (cross-page proof)                      |
-| The existing tests still pass.                                                                                                                                                                     | 12                    | 2 and 3 (imports updated) plus whole-suite verification             |
+| Done when (intent.md) | Spec behaviours | Phase |
+| :-- | :-- | :-- |
+| The pinned announcement records are defined in exactly one place in the codebase, and that place is `pinned_announcements.py`. | 1, 2 | 1 (module created) and 3 (duplicates removed and uniqueness proven) |
+| `get_display_announcements()` is defined in exactly one place, is importable from `pinned_announcements.py`, and is imported by both `streamlit_app.py` and `pages/1_📢_Announcements.py`. | 1, 2, 3, 4 | 1 (defined) and 2, 3 (imported by both pages) |
+| Neither page contains a local pinned-records definition or a local copy of the display-selection logic. | 3, 4 | 2 (home page) and 3 (Announcements page) |
+| For the same underlying announcement data, the home page's 最新动态 block and the Announcements page surface the same pinned announcements in the same order. | 5, 6, 7, 8, 9, 10, 11 | 1 (ordering contract) and 3 (cross-page proof) |
+| The existing tests still pass. | 12 | 2 and 3 (imports updated) plus whole-suite verification |
 
 ## Phase 1: Shared pinned-announcements module
 
 <!-- phase: 1 -->
-
 <!-- targets: pinned_announcements.py, tests/test_pinned_announcements.py -->
-
 <!-- frozen: streamlit_app.py, pages/1_📢_Announcements.py, data.py, auth.py, theme.py, test_streamlit_app.py, tests/test_pinned_winners_announcement.py, pyproject.toml, requirements.txt -->
 
 **Goal:** `import pinned_announcements` works with no Streamlit, no secrets and no I/O, and `get_display_announcements` returns module pinned records first, extra pinned records next, remaining records last, without mutating or truncating.
@@ -87,7 +84,7 @@ from pinned_announcements import PINNED_ANNOUNCEMENTS, get_display_announcements
 
 
 def _ann(ann_id: str, pinned=None, **extra) -> dict:
-    """iBuild a minimal input record; omit the pinned key when pinned is None."""
+    """Build a minimal input record; omit the pinned key when pinned is None."""
     record = {
         "id": ann_id,
         "title": f"title-{ann_id}",
@@ -106,20 +103,18 @@ PINNED_IDS = [record["id"] for record in PINNED_ANNOUNCEMENTS]
 ```
 
   All tests are pure and need no fixtures, threads, servers or teardown; none touches the network.
-
-- [ ] `tests/test_pinned_announcements.py::test_module_exposes_records_and_helper` — proves spec behaviour 1. Assert `isinstance(PINNED_ANNOUNCEMENTS, list)`, `PINNED_ANNOUNCEMENTS` is non-empty, `all(isinstance(record, dict) for record in PINNED_ANNOUNCEMENTS)`, `callable(get_display_announcements)`, and for each record `set(record) >= {"id", "title", "date", "author", "pinned", "body", "tags"}` with `record["pinned"] is True` and `isinstance(record["tags"], list)`.
-- [ ] `tests/test_pinned_announcements.py::test_import_is_side_effect_free_and_streamlit_free` — proves spec behaviour 1 (no import-time side effects, I/O or exceptions). Run `subprocess.run([sys.executable, "-c", CODE], cwd=REPO_ROOT, env={**os.environ, "PYTHONPATH": str(REPO_ROOT)}, capture_output=True, text=True, check=True)` where `CODE` is a one-liner that imports `sys` and `pinned_announcements`, asserts `PINNED_ANNOUNCEMENTS` is a non-empty list of dicts, asserts `callable(p.get_display_announcements)`, and asserts `"streamlit" not in sys.modules`. Then assert `_proc.stdout == ""` and `_proc.stderr == ""`.
-- [ ] `tests/test_pinned_announcements.py::test_pinned_records_come_before_non_pinned` — proves spec behaviour 5. Input `[_ann("x-1", pinned=False), _ann("x-2", pinned=True), _ann("x-3")]`; assert `result[:len(PINNED_ANNOUNCEMENTS)] == PINNED_ANNOUNCEMENTS`, `result[len(PINNED_ANNOUNCEMENTS)]["id"] == "x-2"`, and `[item["id"] for item in result] == PINNED_IDS + ["x-2", "x-1", "x-3"]`.
-- [ ] `tests/test_pinned_announcements.py::test_module_records_then_extra_pinned_then_rest` — proves spec behaviour 6. Input `[_ann("n-1"), _ann("p-extra", pinned=True), _ann("n-2"), _ann("p-extra-2", pinned=True)]`; assert the returned ids equal `PINNED_IDS + ["p-extra", "p-extra-2", "n-1", "n-2"]`.
-- [ ] `tests/test_pinned_announcements.py::test_module_record_is_not_duplicated_by_input` — proves spec behaviour 6 ("additional pinned input records"): dedupe by `id`. Input `[{**PINNED_ANNOUNCEMENTS[0], "title": "changed-in-input"}]`; assert the returned list equals `PINNED_ANNOUNCEMENTS` (length and contents), i.e. the module copy wins and the announcement is not shown twice.
-- [ ] `tests/test_pinned_announcements.py::test_none_and_empty_return_the_module_records` — proves spec behaviour 7. Assert `get_display_announcements(None) == PINNED_ANNOUNCEMENTS`, `get_display_announcements([]) == PINNED_ANNOUNCEMENTS`, and `get_display_announcements(None) is not PINNED_ANNOUNCEMENTS` (a fresh list, so callers cannot mutate module state).
-- [ ] `tests/test_pinned_announcements.py::test_missing_none_or_false_pinned_goes_to_non_pinned_group` — proves spec behaviour 8. Input `[_ann("no-key"), _ann("none-value", pinned=None), _ann("false-value", pinned=False)]`; assert `[item["id"] for item in result] == PINNED_IDS + ["no-key", "none-value", "false-value"]`.
-- [ ] `tests/test_pinned_announcements.py::test_call_is_pure_and_repeatable` — proves spec behaviour 9. Build `input_list = [_ann("n-1"), _ann("p-1", pinned=True)]`, take `snapshot = copy.deepcopy(input_list)`, call twice; assert `first == second`, `first is not second`, and `input_list == snapshot` (no mutation of the argument or module state, verified again by asserting `PINNED_ANNOUNCEMENTS` still equals a deep-copied snapshot taken before the calls).
-- [ ] `tests/test_pinned_announcements.py::test_result_is_not_truncated` — proves spec behaviour 10. Input `[_ann(f"n-{i}") for i in range(5)]`; assert `len(result) == len(PINNED_ANNOUNCEMENTS) + 5` and that all five ids survive in order, i.e. no "2 results" cap is applied inside the function.
+  - [ ] `tests/test_pinned_announcements.py::test_module_exposes_records_and_helper` — proves spec behaviour 1. Assert `isinstance(PINNED_ANNOUNCEMENTS, list)`, `PINNED_ANNOUNCEMENTS` is non-empty, `all(isinstance(record, dict) for record in PINNED_ANNOUNCEMENTS)`, `callable(get_display_announcements)`, and for each record `set(record) >= {"id", "title", "date", "author", "pinned", "body", "tags"}` with `record["pinned"] is True` and `isinstance(record["tags"], list)`.
+  - [ ] `tests/test_pinned_announcements.py::test_import_is_side_effect_free_and_streamlit_free` — proves spec behaviour 1 (no import-time side effects, I/O or exceptions). Run `subprocess.run([sys.executable, "-c", CODE], cwd=REPO_ROOT, env={**os.environ, "PYTHONPATH": str(REPO_ROOT)}, capture_output=True, text=True, check=True)` where `CODE` is a one-liner that imports `sys` and `pinned_announcements`, asserts `PINNED_ANNOUNCEMENTS` is a non-empty list of dicts, asserts `callable(p.get_display_announcements)`, and asserts `"streamlit" not in sys.modules`. Then assert `_proc.stdout == ""` and `_proc.stderr == ""`.
+  - [ ] `tests/test_pinned_announcements.py::test_pinned_records_come_before_non_pinned` — proves spec behaviour 5. Input `[_ann("x-1", pinned=False), _ann("x-2", pinned=True), _ann("x-3")]`; assert `result[:len(PINNED_ANNOUNCEMENTS)] == PINNED_ANNOUNCEMENTS`, `result[len(PINNED_ANNOUNCEMENTS)]["id"] == "x-2"`, and `[item["id"] for item in result] == PINNED_IDS + ["x-2", "x-1", "x-3"]`.
+  - [ ] `tests/test_pinned_announcements.py::test_module_records_then_extra_pinned_then_rest` — proves spec behaviour 6. Input `[_ann("n-1"), _ann("p-extra", pinned=True), _ann("n-2"), _ann("p-extra-2", pinned=True)]`; assert the returned ids equal `PINNED_IDS + ["p-extra", "p-extra-2", "n-1", "n-2"]`.
+  - [ ] `tests/test_pinned_announcements.py::test_module_record_is_not_duplicated_by_input` — proves spec behaviour 6 ("additional pinned input records"): dedupe by `id`. Input `[{**PINNED_ANNOUNCEMENTS[0], "title": "changed-in-input"}]`; assert the returned list equals `PINNED_ANNOUNCEMENTS` (length and contents), i.e. the module copy wins and the announcement is not shown twice.
+  - [ ] `tests/test_pinned_announcements.py::test_none_and_empty_return_the_module_records` — proves spec behaviour 7. Assert `get_display_announcements(None) == PINNED_ANNOUNCEMENTS`, `get_display_announcements([]) == PINNED_ANNOUNCEMENTS`, and `get_display_announcements(None) is not PINNED_ANNOUNCEMENTS` (a fresh list, so callers cannot mutate module state).
+  - [ ] `tests/test_pinned_announcements.py::test_missing_none_or_false_pinned_goes_to_non_pinned_group` — proves spec behaviour 8. Input `[_ann("no-key"), _ann("none-value", pinned=None), _ann("false-value", pinned=False)]`; assert `[item["id"] for item in result] == PINNED_IDS + ["no-key", "none-value", "false-value"]`.
+  - [ ] `tests/test_pinned_announcements.py::test_call_is_pure_and_repeatable` — proves spec behaviour 9. Build `input_list = [_ann("n-1"), _ann("p-1", pinned=True)]`, take `snapshot = copy.deepcopy(input_list)`, call twice; assert `first == second`, `first is not second`, and `input_list == snapshot` (no mutation of the argument or module state, verified again by asserting `PINNED_ANNOUNCEMENTS` still equals a deep-copied snapshot taken before the calls).
+  - [ ] `tests/test_pinned_announcements.py::test_result_is_not_truncated` — proves spec behaviour 10. Input `[_ann(f"n-{i}") for i in range(5)]`; assert `len(result) == len(PINNED_ANNOUNCEMENTS) + 5` and that all five ids survive in order, i.e. no "2 results" cap is applied inside the function.
 - [ ] Observable check, no truncation of the module itself: `uv run python -c "import pinned_announcements as p; print(len(p.PINNED_ANNOUNCEMENTS), [a['id'] for a in p.get_display_announcements(None)])"` prints the number of pinned records followed by their ids, in module order, with no traceback.
 
 **Verify:**
-
 ```bash
 uv run pytest tests/test_pinned_announcements.py -v
 ```
@@ -129,9 +124,7 @@ uv run pytest tests/test_pinned_announcements.py -v
 ## Phase 2: Home page uses the shared selector
 
 <!-- phase: 2 -->
-
 <!-- targets: streamlit_app.py, test_streamlit_app.py, tests/test_pinned_winners_announcement.py, tests/test_announcement_page_wiring.py -->
-
 <!-- frozen: pinned_announcements.py, pages/1_📢_Announcements.py, data.py, auth.py, theme.py, tests/test_pinned_announcements.py, pyproject.toml, requirements.txt -->
 
 **Goal:** `streamlit_app.py` contains no pinned-record literal and no local `get_display_announcements`, imports the helper from `pinned_announcements`, and its 最新动态 block still shows the same two announcements as before (same order, same truncation, same markup).
@@ -217,12 +210,11 @@ def _has_module_level_pinned_literal(tree: ast.Module) -> bool:
 ```
 
   Phase 2 adds these tests to that file (Phase 3 extends the same file):
-
-- [ ] `tests/test_announcement_page_wiring.py::test_home_page_imports_shared_helper` — proves spec behaviour 3: `"pinned_announcements" in _import_sources(_tree(HOME_PAGE)).get("get_display_announcements", set())`.
-- [ ] `tests/test_announcement_page_wiring.py::test_home_page_has_no_local_pinned_records_or_helper` — proves spec behaviour 3: assert `_has_module_level_pinned_literal(_tree(HOME_PAGE))` is `False` and `_defines_helper(_tree(HOME_PAGE))` is `False`.
-- [ ] `tests/test_announcement_page_wiring.py::test_home_page_calls_the_shared_helper` — proves spec behaviour 11 (home side): assert the `streamlit_app.py` tree contains at least one `ast.Call` whose `func` is `ast.Name(id="get_display_announcements")`.
-- [ ] `tests/test_announcement_page_wiring.py::test_home_page_selection_is_the_shared_selection` — proves spec behaviours 5, 6: with `sample = [{"id": "n-1", "pinned": False}, {"id": "p-extra", "pinned": True}]` (plus the required keys), assert `[a["id"] for a in get_display_announcements(sample)[:2]] == [record["id"] for record in PINNED_ANNOUNCEMENTS][:2]`, i.e. the 最新动态 cap keeps the first two module pinned records in module order.
-- [ ] `tests/test_announcement_page_wiring.py::test_no_file_imports_relocated_names_from_old_locations` — proves spec behaviour 12: for every file in `APP_FILES`, `REPO_ROOT.glob("test_*.py")`, `(REPO_ROOT / "tests").glob("*.py")` and `(REPO_ROOT / "features").rglob("*.py")`, assert that for each relocated name in `_import_sources(_tree(path))`, the only allowed source module is `pinned_announcements` (collect violations into a list and assert the list is empty, so the failure message names the offender).
+  - [ ] `tests/test_announcement_page_wiring.py::test_home_page_imports_shared_helper` — proves spec behaviour 3: `"pinned_announcements" in _import_sources(_tree(HOME_PAGE)).get("get_display_announcements", set())`.
+  - [ ] `tests/test_announcement_page_wiring.py::test_home_page_has_no_local_pinned_records_or_helper` — proves spec behaviour 3: assert `_has_module_level_pinned_literal(_tree(HOME_PAGE))` is `False` and `_defines_helper(_tree(HOME_PAGE))` is `False`.
+  - [ ] `tests/test_announcement_page_wiring.py::test_home_page_calls_the_shared_helper` — proves spec behaviour 11 (home side): assert the `streamlit_app.py` tree contains at least one `ast.Call` whose `func` is `ast.Name(id="get_display_announcements")`.
+  - [ ] `tests/test_announcement_page_wiring.py::test_home_page_selection_is_the_shared_selection` — proves spec behaviours 5, 6: with `sample = [{"id": "n-1", "pinned": False}, {"id": "p-extra", "pinned": True}]` (plus the required keys), assert `[a["id"] for a in get_display_announcements(sample)[:2]] == [record["id"] for record in PINNED_ANNOUNCEMENTS][:2]`, i.e. the 最新动态 cap keeps the first two module pinned records in module order.
+  - [ ] `tests/test_announcement_page_wiring.py::test_no_file_imports_relocated_names_from_old_locations` — proves spec behaviour 12: for every file in `APP_FILES`, `REPO_ROOT.glob("test_*.py")`, `(REPO_ROOT / "tests").glob("*.py")` and `(REPO_ROOT / "features").rglob("*.py")`, assert that for each relocated name in `_import_sources(_tree(path))`, the only allowed source module is `pinned_announcements` (collect violations into a list and assert the list is empty, so the failure message names the offender).
 - [ ] Observable check: `uv run python -c "import ast, pathlib; tree = ast.parse(pathlib.Path('streamlit_app.py').read_text(encoding='utf-8')); print(sum(isinstance(n, ast.FunctionDef) and n.name == 'get_display_announcements' for n in ast.walk(tree)))"` prints `0`.
 
 **Definition of done:**
@@ -233,7 +225,6 @@ def _has_module_level_pinned_literal(tree: ast.Module) -> bool:
 - [ ] Observable check above prints `0`.
 
 **Verify:**
-
 ```bash
 uv run pytest tests/test_announcement_page_wiring.py tests/test_pinned_announcements.py tests/test_pinned_winners_announcement.py test_streamlit_app.py -v
 ```
@@ -243,9 +234,7 @@ uv run pytest tests/test_announcement_page_wiring.py tests/test_pinned_announcem
 ## Phase 3: Announcements page uses the shared selector and uniqueness is proven
 
 <!-- phase: 3 -->
-
 <!-- targets: pages/1_📢_Announcements.py, tests/test_announcement_page_wiring.py, tests/test_pinned_winners_announcement.py -->
-
 <!-- frozen: streamlit_app.py, pinned_announcements.py, data.py, auth.py, theme.py, tests/test_pinned_announcements.py, test_streamlit_app.py, pyproject.toml, requirements.txt -->
 
 **Goal:** `pages/1_📢_Announcements.py` holds no pinned records and no local selector, and parsing all application Python files shows the records and `get_display_announcements` exist only in `pinned_announcements.py`.
@@ -272,7 +261,6 @@ uv run pytest tests/test_announcement_page_wiring.py tests/test_pinned_announcem
 - [ ] A repository-wide scan finds no stale import of `PINNED_ANNOUNCEMENTS` or `get_display_announcements` from `streamlit_app` or from the Announcements page (Phase 2 test, re-run in this phase's Verify).
 
 **Verify:**
-
 ```bash
 uv run pytest tests/test_announcement_page_wiring.py tests/test_pinned_announcements.py tests/test_pinned_winners_announcement.py -v
 test -z "$(grep -n 'def get_display_announcements' streamlit_app.py 'pages/1_📢_Announcements.py' || true)"
@@ -301,6 +289,5 @@ test -z "$(grep -n 'def get_display_announcements' streamlit_app.py 'pages/1_�
 ## Hand back
 
 When every phase is built and its Verify block passes:
-
 1. Create `sdlc/features/003-front-page-in-streamlit-app-py/build-log.md` with one section per phase, in order. Head each one `## Phase <n>: <title>`, then list the files changed, the Verify command you ran and its result, and any deviation from this plan (or "none").
 2. Commit it and push it to `feature/003-front-page-in-streamlit-app-py`.
