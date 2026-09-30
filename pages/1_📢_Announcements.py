@@ -6,6 +6,39 @@ from datetime import date
 from theme import inject_theme, hero, section, flash, show_flash, sync_status
 from data import load_announcements, save_announcements
 from auth import is_admin_user
+from typing import Any
+
+PINNED_2026_WINNERS_ANNOUNCEMENT_ID: str = "pinned-2026-season-winners"
+
+PINNED_2026_WINNERS_ANNOUNCEMENT: dict[str, Any] = {
+    "id": PINNED_2026_WINNERS_ANNOUNCEMENT_ID,
+    "title": "🎉 2026 赛季个人冠军公告",
+    "date": "2026-09-15",
+    "author": "GCO 组委会",
+    "pinned": True,
+    "body": (
+        "2026赛季个人荣誉揭晓！\n\n"
+        "恭喜 张纬 获得 2026 个人联赛冠军！\n"
+        "恭喜 王文龙 获得 2026 个人杯赛冠军！\n\n"
+        "感谢所有成员的参与，期待下个赛季再创佳绩！"
+    ),
+    "tags": ["2026", "冠军"],
+}
+
+
+def get_pinned_winners_announcement() -> dict[str, Any]:
+    """Return a fresh copy of the 2026 season winners announcement."""
+    announcement = dict(PINNED_2026_WINNERS_ANNOUNCEMENT)
+    announcement["tags"] = list(PINNED_2026_WINNERS_ANNOUNCEMENT["tags"])
+    return announcement
+
+
+def get_display_announcements(
+    stored_announcements: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return a new list with the pinned winners announcement first."""
+    return [get_pinned_winners_announcement(), *stored_announcements]
+
 
 st.set_page_config(page_title="GCO | 公告", page_icon="📢", layout="wide")
 inject_theme(st)
