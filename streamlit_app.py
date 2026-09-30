@@ -6,6 +6,7 @@ import streamlit as st
 import datetime
 from theme import inject_theme, hero, section
 from data import load_announcements, load_events
+from pinned_announcements import get_display_announcements
 
 st.set_page_config(
     page_title="GCO Golf Club",
@@ -27,7 +28,7 @@ with col1:
     anns = load_announcements()
     # pinned and most recent
     anns_sorted = sorted(anns, key=lambda a: (not a.get("pinned", False), a["date"]))
-    top_anns = anns_sorted[:2]
+    top_anns = get_display_announcements(anns_sorted)[:2]
     
     if top_anns:
         for ann in top_anns:
