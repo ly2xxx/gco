@@ -173,3 +173,65 @@ def test_upcoming_section_present_and_date_ordered_when_events_exist(render_fron
     calendar_links = [link for link in page.page_links if link["page"] == CALENDAR_PAGE]
     assert calendar_links, "the full-calendar page link was not rendered"
     assert calendar_links[0]["label"] == CALENDAR_LABEL
+
+
+def test_today_event_counts_as_upcoming(render_front_page) -> None:
+    """Spec 7: an event dated exactly today is upcoming and is listed."""
+    today = datetime.date.today().isoformat()
+    page = render_front_page(events=[_event(today, "EVENT-TODAY")])
+    assert page.exceptions == []
+    assert page.contains(HEADING)
+    assert page.contains("EVENT-TODAY")
+
+
+def test_upcoming_block_lists_at_most_three_earliest_events(render_front_page) -> None:
+    """Spec 8: four future events → exactly the three earliest, ascending."""
+    events = [
+        _event("2099-04-01", "EVENT-DELTA"),
+        _event("2099-01-01", "EVENT-ALPHA"),
+        _event("2099-03-01", "EVENT-GAMMA"),
+        _event("2099-02-01", "EVENT-BETA"),
+    ]
+    page = render_front_page(events=events)
+    assert page.exceptions == []
+    assert page.index_of("EVENT-ALPHA") < page.index_of("EVENT-BETA") < page.index_of("EVENT-GAMMA")
+    assert not page.contains("EVENT-DELTA")
+
+
+def test_event_card_content_matches_event_record(render_front_page) -> None:
+    """Spec 9: card renders date, name and details; a missing `details` key still renders."""
+    page = render_front_page(
+        events=[_event("2099-01-01", "EVENT-ALPHA", details="DETAILS-ALPHA")]
+    )
+    assert page.contains("2099-01-01")
+    assert page.contains("EVENT-ALPHA")
+    assert page.contains("DETAILS-ALPHA")
+
+    page = render_front_page(
+        events=[_event("2099-01-02", "EVENT-NO-DETAILS", details=None)]
+    )
+    assert page.exceptions == []
+    assert page.contains("EVENT-NO-DETAILS")
+
+
+def test_other_front_page_sections_ordering_unchanged(render_front_page) -> None:
+    """Spec 12: elements rendered in both states keep their relative order.
+
+    Texts that exist in only one of the two states (e.g. anything derived from the
+    upcoming list) are excluded; every shared element must keep its relative order.
+    """
+    hidden_page = render_front_page(events=[])
+    shown_page = render_front_page(events=[_event("2099-01-01", "EVENT-ALPHA")])
+
+    hidden_texts = hidden_page.texts
+    shown_texts = shown_page.texts
+    assert hidden_texts, "the front page rendered no text at all"
+    assert not hidden_page.contains("EVENT-ALPHA")
+
+    shared = set(hidden_texts) & set(shown_texts)
+    assert shared, "the hidden and shown renders share no front-page element"
+
+    hidden_order = [text for text in hidden_texts if text in shared]
+    shown_order = [text for text in shown_texts if text in shared]
+    assert hidden_order == shown_order
+
