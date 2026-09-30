@@ -172,12 +172,14 @@ def test_get_pinned_winners_announcement_returns_fresh_copy(load_announcements_p
 
 
 def test_get_display_announcements_empty(load_announcements_page):
-    """Spec behaviour 1."""
+    """Spec behaviour 13."""
     module, _, _ = load_announcements_page()
     result = module.get_display_announcements([])
 
-    assert len(result) == 1
+    assert len(result) == 2
+    assert [a["id"] for a in result] == ["pinned-2026-season-winners", "pinned-2026-outing-day-result"]
     assert result[0] == module.get_pinned_winners_announcement()
+    assert result[1] == module.get_pinned_outing_day_result_announcement()
 
 
 def test_get_display_announcements_pins_first_before_stored_pinned(load_announcements_page):
@@ -207,7 +209,15 @@ def test_get_display_announcements_pins_first_before_stored_pinned(load_announce
 
     result = module.get_display_announcements(stored)
 
-    assert [a["id"] for a in result] == ["pinned-2026-season-winners", "s1", "s2"]
+    assert [a["id"] for a in result] == [
+        "pinned-2026-season-winners",
+        "pinned-2026-outing-day-result",
+        "s1",
+        "s2",
+    ]
+    assert result[2] is stored[0]
+    assert result[3] is stored[1]
+    assert len(stored) == 2
     assert stored == before
 
 
@@ -228,9 +238,14 @@ def test_get_display_announcements_passes_through_missing_fields(load_announceme
 
     result = module.get_display_announcements(stored)
 
-    assert len(result) == 2
-    assert result[1] == stored[0]
-    assert result[1] is stored[0]
+    assert len(result) == 3
+    assert [a["id"] for a in result] == [
+        "pinned-2026-season-winners",
+        "pinned-2026-outing-day-result",
+        "s1",
+    ]
+    assert result[2] == stored[0]
+    assert result[2] is stored[0]
 
 
 def test_get_pinned_winners_announcement_does_not_read_stored_store(load_announcements_page, monkeypatch):
@@ -279,12 +294,24 @@ def test_page_renders_pinned_winners_before_stored(load_announcements_page):
         for value in (*args, *kwargs.values())
     )
 
-    assert "🎉 2026 赛季个人冠军公告" in text
+    winners_title = "🎉 2026 赛季个人冠军公告"
+    outing_title = "🎉 2026 Outing Day 对抗赛结果公告"
+    roster = "刘北南 • 李扬 • 赵鲲 • 张纬 • Justin • 曾诚"
+
+    assert winners_title in text
     assert "张纬" in text and "王文龙" in text
+    assert outing_title in text
+    assert "红队 Red Team" in text and "5.0 pts" in text
+    assert "黑队 Black Team" in text and "3.0 pts" in text
+    assert roster in text
     assert "STORED PINNED TITLE" in text
     assert "STORED NORMAL TITLE" in text
-    assert text.index("🎉 2026 赛季个人冠军公告") < text.index("STORED PINNED TITLE")
-    assert text.index("🎉 2026 赛季个人冠军公告") < text.index("STORED NORMAL TITLE")
+
+    assert text.index(winners_title) < text.index(outing_title)
+    assert text.index(outing_title) < text.index("STORED PINNED TITLE")
+    assert text.index(outing_title) < text.index("STORED NORMAL TITLE")
+    assert text.index(roster) < text.index("STORED NORMAL TITLE")
+
     assert stored == before
     assert save_calls == []
 

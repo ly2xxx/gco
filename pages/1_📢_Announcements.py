@@ -57,8 +57,12 @@ def get_pinned_outing_day_result_announcement() -> dict[str, Any]:
 def get_display_announcements(
     stored_announcements: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Return a new list with the pinned winners announcement first."""
-    return [get_pinned_winners_announcement(), *stored_announcements]
+    """Return [pinned winners announcement, pinned outing day result announcement, *stored_announcements]."""
+    return [
+        get_pinned_winners_announcement(),
+        get_pinned_outing_day_result_announcement(),
+        *stored_announcements,
+    ]
 
 
 st.set_page_config(page_title="GCO | 公告", page_icon="📢", layout="wide")
