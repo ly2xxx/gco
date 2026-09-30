@@ -131,3 +131,44 @@ def test_no_file_imports_relocated_names_from_old_locations():
                 violations.append(f"{path.relative_to(REPO_ROOT)}: {name} from {sorted(modules)}")
 
     assert violations == []
+
+
+def test_announcements_page_imports_shared_helper():
+    """Spec behaviour 4."""
+    assert "pinned_announcements" in _import_sources(_tree(ANNOUNCEMENTS_PAGE)).get("get_display_announcements", set())
+
+
+def test_announcements_page_has_no_local_pinned_records_or_helper():
+    """Spec behaviour 4."""
+    tree = _tree(ANNOUNCEMENTS_PAGE)
+    assert _has_module_level_pinned_literal(tree) is False
+    assert _defines_helper(tree) is False
+
+
+def test_announcements_page_calls_the_shared_helper():
+    """Spec behaviour 11 (Announcements side)."""
+    assert _calls_helper(_tree(ANNOUNCEMENTS_PAGE))
+
+
+def test_only_shared_module_defines_records_or_helper():
+    """Spec behaviour 2."""
+    assert {path.name for path in APP_FILES if _has_module_level_pinned_literal(_tree(path))} == {
+        "pinned_announcements.py"
+    }
+    assert {path.name for path in APP_FILES if _defines_helper(_tree(path))} == {"pinned_announcements.py"}
+
+
+def test_both_pages_share_one_pinned_sequence():
+    """Spec behaviours 5, 6, 11: one input list, one pinned id sequence on both pages."""
+    sample = [
+        *PINNED_ANNOUNCEMENTS,
+        _record("p-extra", True),
+        _record("n-1", False),
+        _record("n-2", False),
+    ]
+
+    home_ids = [a["id"] for a in get_display_announcements(sample)[:2]]
+    announcements_ids = [a["id"] for a in get_display_announcements(sample)]
+
+    assert home_ids == announcements_ids[:2]
+    assert home_ids == [record["id"] for record in PINNED_ANNOUNCEMENTS][:2]
