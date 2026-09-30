@@ -1,0 +1,70 @@
+name: SDLC Pipeline
+
+# One run, one line: idea -> intent.md -> spec.md -> plan.md (Ollama Cloud) ->
+# ⏸ build (Claude Code or a person; step 4 waits for it) -> verify -> Ollama
+# review -> pull request. The pipeline itself is the reusable workflow in
+# ly2xxx/.github; see sdlc/README.md for how to run it.
+#
+#   Start it: Run workflow with an idea, or open an issue labelled "sdlc" (title
+#     = idea; "feature: <name>" in the body revises that feature, and with
+#     "start: build" runs only steps 5-6). Claude Code can open issues but can't
+#     start runs, which is why the issue trigger exists. Only people with triage
+#     or write access can add the label, so outside issues don't start runs.
+#   Each ✋ job waits on the sdlc-review environment until a reviewer approves.
+#   Step 4 waits up to 3 hours until build-log.md on the feature branch logs
+#     every phase, then the same run verifies, reviews and opens the PR.
+#
+# One-time setup (Settings):
+#   Environments -> sdlc-review -> Required reviewers: add yourself.
+#   Secrets and variables -> Actions: OLLAMA_API_KEY (secret); OLLAMA_MODEL and
+#     OLLAMA_THINK (optional variables).
+#   Actions -> General -> "Allow GitHub Actions to create and approve pull
+#     requests", or an SDLC_PR_TOKEN secret, which also lets CI run on the PR.
+
+run-name: "SDLC · ${{ inputs.feature || inputs.idea || github.event.issue.title }} · from ${{ inputs.start || 'issue' }} · ${{ inputs.builder || 'claude' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      idea:
+        description: "Idea (one line). Starts a new feature, or revises the feature named below."
+        required: false
+      feature:
+        description: "Existing feature folder under sdlc/features. Alone, once built, it runs verify and opens the PR."
+        required: false
+      start:
+        description: "Where to start. auto = intent with an idea, else the first missing document, else the build run."
+        type: choice
+        options: [auto, intent, spec, plan, build]
+        default: auto
+      builder:
+        description: "Who builds at step 4."
+        type: choice
+        options: [claude, human]
+        default: claude
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sdlc:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'sdlc'
+    uses: ly2xxx/.github/.github/workflows/sdlc.yml@main
+    with:
+      idea: ${{ inputs.idea || github.event.issue.title || '' }}
+      feature: ${{ inputs.feature }}
+      start: ${{ inputs.start }}
+      builder: ${{ inputs.builder }}
+      model: ${{ vars.OLLAMA_MODEL || 'deepseek-v4-flash:cloud' }}
+      think: ${{ vars.OLLAMA_THINK || '' }}
+      # pyproject.toml has no build backend, so the default `uv pip install -e .`
+      # fails on this flat layout; install requirements.txt instead.
+      install-command: uv pip install -r requirements.txt
+      test-command: python -m pytest -q && behave --format progress
+      build-wait-minutes: 180
+    secrets:
+      OLLAMA_API_KEY: ${{ secrets.OLLAMA_API_KEY }}
+      SDLC_PR_TOKEN: ${{ secrets.SDLC_PR_TOKEN }}
