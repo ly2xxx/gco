@@ -1,6 +1,7 @@
 """
 GCO 2026 – Announcements page
 """
+import copy
 import streamlit as st
 from datetime import date
 from theme import inject_theme, hero, section, flash, show_flash, sync_status
@@ -25,6 +26,21 @@ PINNED_2026_WINNERS_ANNOUNCEMENT: dict[str, Any] = {
     "tags": ["2026", "冠军"],
 }
 
+PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT: dict[str, Any] = {
+    "id": "pinned-2026-outing-day-result",
+    "title": "🎉 2026 Outing Day 对抗赛结果公告",
+    "date": "2026-08-16",
+    "author": PINNED_2026_WINNERS_ANNOUNCEMENT["author"],
+    "pinned": True,
+    "body": (
+        "🏌️ Outing Day 对抗赛结果\n"
+        "\n"
+        "红队 Red Team 5.0 pts 战胜 黑队 Black Team 3.0 pts\n"
+        "红队阵容：刘北南 • 李扬 • 赵鲲 • 张纬 • Justin • 曾诚"
+    ),
+    "tags": ["Outing Day", "对抗赛"],
+}
+
 
 def get_pinned_winners_announcement() -> dict[str, Any]:
     """Return a fresh copy of the 2026 season winners announcement."""
@@ -33,11 +49,20 @@ def get_pinned_winners_announcement() -> dict[str, Any]:
     return announcement
 
 
+def get_pinned_outing_day_result_announcement() -> dict[str, Any]:
+    """Return a fresh deep copy of PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT."""
+    return copy.deepcopy(PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT)
+
+
 def get_display_announcements(
     stored_announcements: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Return a new list with the pinned winners announcement first."""
-    return [get_pinned_winners_announcement(), *stored_announcements]
+    """Return [pinned winners announcement, pinned outing day result announcement, *stored_announcements]."""
+    return [
+        get_pinned_winners_announcement(),
+        get_pinned_outing_day_result_announcement(),
+        *stored_announcements,
+    ]
 
 
 st.set_page_config(page_title="GCO | 公告", page_icon="📢", layout="wide")

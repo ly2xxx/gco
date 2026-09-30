@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import importlib.util
 import pathlib
+import re
 import sys
 import types
 from typing import Any
@@ -171,12 +172,14 @@ def test_get_pinned_winners_announcement_returns_fresh_copy(load_announcements_p
 
 
 def test_get_display_announcements_empty(load_announcements_page):
-    """Spec behaviour 1."""
+    """Spec behaviour 13."""
     module, _, _ = load_announcements_page()
     result = module.get_display_announcements([])
 
-    assert len(result) == 1
+    assert len(result) == 2
+    assert [a["id"] for a in result] == ["pinned-2026-season-winners", "pinned-2026-outing-day-result"]
     assert result[0] == module.get_pinned_winners_announcement()
+    assert result[1] == module.get_pinned_outing_day_result_announcement()
 
 
 def test_get_display_announcements_pins_first_before_stored_pinned(load_announcements_page):
@@ -206,7 +209,15 @@ def test_get_display_announcements_pins_first_before_stored_pinned(load_announce
 
     result = module.get_display_announcements(stored)
 
-    assert [a["id"] for a in result] == ["pinned-2026-season-winners", "s1", "s2"]
+    assert [a["id"] for a in result] == [
+        "pinned-2026-season-winners",
+        "pinned-2026-outing-day-result",
+        "s1",
+        "s2",
+    ]
+    assert result[2] is stored[0]
+    assert result[3] is stored[1]
+    assert len(stored) == 2
     assert stored == before
 
 
@@ -227,9 +238,14 @@ def test_get_display_announcements_passes_through_missing_fields(load_announceme
 
     result = module.get_display_announcements(stored)
 
-    assert len(result) == 2
-    assert result[1] == stored[0]
-    assert result[1] is stored[0]
+    assert len(result) == 3
+    assert [a["id"] for a in result] == [
+        "pinned-2026-season-winners",
+        "pinned-2026-outing-day-result",
+        "s1",
+    ]
+    assert result[2] == stored[0]
+    assert result[2] is stored[0]
 
 
 def test_get_pinned_winners_announcement_does_not_read_stored_store(load_announcements_page, monkeypatch):
@@ -278,11 +294,80 @@ def test_page_renders_pinned_winners_before_stored(load_announcements_page):
         for value in (*args, *kwargs.values())
     )
 
-    assert "🎉 2026 赛季个人冠军公告" in text
+    winners_title = "🎉 2026 赛季个人冠军公告"
+    outing_title = "🎉 2026 Outing Day 对抗赛结果公告"
+    roster = "刘北南 • 李扬 • 赵鲲 • 张纬 • Justin • 曾诚"
+
+    assert winners_title in text
     assert "张纬" in text and "王文龙" in text
+    assert outing_title in text
+    assert "红队 Red Team" in text and "5.0 pts" in text
+    assert "黑队 Black Team" in text and "3.0 pts" in text
+    assert roster in text
     assert "STORED PINNED TITLE" in text
     assert "STORED NORMAL TITLE" in text
-    assert text.index("🎉 2026 赛季个人冠军公告") < text.index("STORED PINNED TITLE")
-    assert text.index("🎉 2026 赛季个人冠军公告") < text.index("STORED NORMAL TITLE")
+
+    assert text.index(winners_title) < text.index(outing_title)
+    assert text.index(outing_title) < text.index("STORED PINNED TITLE")
+    assert text.index(outing_title) < text.index("STORED NORMAL TITLE")
+    assert text.index(roster) < text.index("STORED NORMAL TITLE")
+
     assert stored == before
     assert save_calls == []
+
+
+def test_pinned_outing_day_result_announcement_has_exact_fields(load_announcements_page):
+    """Spec behaviours 1, 2, 3, 4, 5, 6, 7."""
+    module, _, _ = load_announcements_page()
+    ann = module.get_pinned_outing_day_result_announcement()
+
+    assert set(ann) == {"id", "title", "date", "author", "pinned", "body", "tags"}
+    assert ann["id"] == "pinned-2026-outing-day-result"
+    assert ann["pinned"] is True
+    assert isinstance(ann["title"], str) and ann["title"]
+    assert "Outing Day" in ann["title"] and "对抗赛" in ann["title"]
+    assert isinstance(ann["date"], str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", ann["date"])
+    assert isinstance(ann["author"], str) and ann["author"]
+    assert isinstance(ann["tags"], list) and all(isinstance(t, str) for t in ann["tags"])
+
+
+def test_pinned_outing_day_result_announcement_body_content(load_announcements_page):
+    """Spec behaviours 8, 9, 10."""
+    module, _, _ = load_announcements_page()
+    body = module.get_pinned_outing_day_result_announcement()["body"]
+
+    assert "红队 Red Team" in body
+    assert "5.0 pts" in body
+    assert "黑队 Black Team" in body
+    assert "3.0 pts" in body
+    assert "刘北南 • 李扬 • 赵鲲 • 张纬 • Justin • 曾诚" in body
+
+
+def test_get_pinned_outing_day_result_announcement_returns_fresh_copy(load_announcements_page):
+    """Spec behaviour 11."""
+    module, _, _ = load_announcements_page()
+    first = module.get_pinned_outing_day_result_announcement()
+    second = module.get_pinned_outing_day_result_announcement()
+
+    assert first == second
+    assert first is not second
+
+    first["tags"].append("mutated")
+    assert "mutated" not in module.PINNED_OUTING_DAY_RESULT_ANNOUNCEMENT["tags"]
+    assert "mutated" not in module.get_pinned_outing_day_result_announcement()["tags"]
+
+
+def test_get_pinned_outing_day_result_announcement_does_not_read_stored_store(
+    load_announcements_page, monkeypatch
+):
+    """Spec behaviour 12."""
+    module, _, _ = load_announcements_page()
+    import data
+
+    def fail():
+        raise AssertionError("stored announcements store was read")
+
+    monkeypatch.setattr(data, "load_announcements", fail)
+
+    ann = module.get_pinned_outing_day_result_announcement()
+    assert ann["id"] == "pinned-2026-outing-day-result"
