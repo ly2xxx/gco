@@ -1,82 +1,75 @@
-<!-- sdlc stage=spec model=deepseek-v4.1-flash:cloud from=intent.md@770cc50 -->
+<!-- sdlc stage=spec model=deepseek-v4.1-flash:cloud from=intent.md@3b3e8ba -->
 ## Summary
-Adds a single new announcement to the Announcements page congratulating the 2026 individual season winners: 张纬 as 个人联赛 winner and 王文龙 as 个人杯赛 winner. It is a static, congratulatory club notice placed as the newest (topmost) entry; no existing announcement or other dashboard page changes.
+
+The Announcements page gains a display-only, pinned 2026 season winners announcement that always appears as the first item, ahead of every stored announcement. It names 张纬 as the 2026 个人联赛 winner and 王文龙 as the 2026 个人杯赛 winner, and carries the same field set as stored announcements (id, title, date, author, pinned, body, tags) with `pinned` set to true. Stored announcements and the storage format are untouched.
 
 ## Behaviour
-1. Given the `pages/1_📢_Announcements.py` module is imported, when the 2026 season-winners announcement is retrieved, then it exposes a `title` and a `body` that are both non-empty strings.
-2. Given the 2026 season-winners announcement, when its title and body are concatenated into one text, then that text contains the exact string `张纬`.
-3. Given the same concatenated text, when it is inspected, then it contains the exact string `个人联赛`.
-4. Given the same concatenated text, when it is inspected, then it contains the exact string `王文龙`.
-5. Given the same concatenated text, when it is inspected, then it contains the exact string `个人杯赛`.
-6. Given the same concatenated text, when each winner is looked up, then the clause that names `张纬` also contains `个人联赛` and the clause that names `王文龙` also contains `个人杯赛`.
-7. Given the same concatenated text, when it is inspected, then it contains the exact string `2026`.
-8. Given the same concatenated text, when it is inspected, then it contains the congratulatory string `祝贺`.
-9. Given the same concatenated text, when it is inspected, then it does not contain the string `张维` (the spelling used in existing scorecard filenames).
-10. Given the page's announcement collection is enumerated, when the entries are listed in render order, then the 2026 season-winners announcement is the first element.
-11. Given the page's announcement collection is enumerated, when it is compared against the pre-change collection, then every pre-existing entry is present exactly once with an identical title and body, and the collection length is exactly one greater than before.
-12. Given the Announcements page is executed through `streamlit.testing.v1.AppTest` with no network access and with the data source unavailable, when the page renders, then the new announcement's title and body appear in the rendered markdown output.
-13. Given the existing test suite, when it is run offline, then it passes unchanged.
+
+1. Given an empty stored announcements list, when the Announcements page builds its display list, then the display list contains exactly one announcement and it is the 2026 winners announcement.
+2. Given a stored announcements list of N entries (N ≥ 0) that includes at least one entry with `pinned` true, when the Announcements page builds its display list, then the 2026 winners announcement is at index 0 and the N stored entries occupy indices 1..N in their original relative order.
+3. Given the 2026 winners announcement object, when its keys are inspected, then it has exactly the keys `id`, `title`, `date`, `author`, `pinned`, `body`, `tags` and no others.
+4. Given the 2026 winners announcement object, when its `pinned` value is read, then it is the boolean `True`.
+5. Given the 2026 winners announcement object, when its `id` value is read, then it equals the constant string `"pinned-2026-season-winners"`, which differs from every id present in the stored announcements list.
+6. Given the 2026 winners announcement object, when its `body` is read, then the body text contains `张纬` together with `个人联赛` and contains `王文龙` together with `个人杯赛`.
+7. Given the 2026 winners announcement object, when its `title`, `date`, `author` and `tags` are read, then `title` is a non-empty string, `date` is a non-empty string, `author` is a non-empty string, `tags` is a list of strings, and `body` is a non-empty string.
+8. Given any stored announcements list, when the Announcements page builds its display list, then the stored list object, its length, its entry order and every field of every stored entry are identical before and after the call.
+9. Given a stored announcements list containing an entry whose `author`, `date` or `tags` value is missing/`None`/empty, when the Announcements page builds its display list, then the call still returns N+1 entries and that stored entry is passed through byte-for-byte unchanged.
+10. Given no network access, no secrets and no data store configured, when the winners announcement is requested via its accessor, then it returns the same announcement object as any other call and no read of the stored announcements store occurs.
+11. Given a stored announcements list, when the Announcements page is rendered, then the winners announcement's title and body are displayed above the stored announcements' titles and bodies.
 
 ## Interfaces
 
-### `pages/1_📢_Announcements.py`
-
-New module-level constant:
+All additions belong in `pages/1_📢_Announcements.py`. No signature in `data.py` or any storage module changes.
 
 ```python
-SEASON_2026_WINNERS_ANNOUNCEMENT: dict[str, str]
-# keys, both required, both non-empty:
-#   "title": str  -> short congratulatory headline, may include "2026赛季"
-#   "body":  str  -> Markdown body; must contain "2026", "祝贺", "张纬", "个人联赛",
-#                    "王文龙", "个人杯赛"; must not contain "张维"
+# pages/1_📢_Announcements.py
+
+PINNED_2026_WINNERS_ANNOUNCEMENT_ID: str = "pinned-2026-season-winners"
+"""Stable synthetic id for the display-only 2026 winners announcement."""
+
+PINNED_2026_WINNERS_ANNOUNCEMENT: dict[str, Any] = {
+    "id": PINNED_2026_WINNERS_ANNOUNCEMENT_ID,
+    "title": "🎉 2026 赛季个人冠军公告",
+    "date": "2026-09-15",
+    "author": "GCO 组委会",
+    "pinned": True,
+    "body": "...",  # congratulatory notice naming 张纬 (个人联赛) and 王文龙 (个人杯赛)
+    "tags": ["2026", "冠军"],
+}
+"""Display-only record; never written to or read from the saved announcements store."""
+
+
+def get_pinned_winners_announcement() -> dict[str, Any]:
+    """Return the 2026 season winners announcement record (a copy of the constant)."""
+
+
+def get_display_announcements(stored_announcements: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return a new list with the pinned winners announcement first, followed by
+    every stored announcement unchanged, in its original order."""
 ```
 
-New module-level function:
+The existing render path in `pages/1_📢_Announcements.py` must obtain its items from `get_display_announcements(...)` rather than rendering the stored list directly, so that the pinned first position and the shared field set (including `pinned`) flow through the existing rendering code unchanged. The save/create/delete/import/export paths must continue to use the stored announcements list only; `get_display_announcements` is never their input.
 
-```python
-def get_season_2026_winners_announcement() -> dict[str, str]:
-    """Return the 2026 individual season-winners announcement.
-
-    Returns a dict with exactly the keys "title" and "body", both non-empty str.
-    Pure: performs no Streamlit calls and no file, network, secret or file-system access.
-    """
-```
-
-Changed existing module-level collection (keep whatever name the file already uses; the example name `ANNOUNCEMENTS` is illustrative only, do not rename existing symbols):
-
-```python
-ANNOUNCEMENTS: list[dict[str, str]]
-# Change: SEASON_2026_WINNERS_ANNOUNCEMENT is prepended at index 0.
-# No other element is added, removed, reordered or reworded.
-```
-
-No new render function is required: the existing per-entry render path on the page is reused unchanged.
-
-### `test_streamlit_app.py`
-
-New pytest tests, runnable offline (no network, no secrets, no manual steps):
-
-```python
-def test_announcements_page_includes_2026_season_winners() -> None: ...
-def test_2026_season_winners_announcement_names_both_winners() -> None: ...
-def test_2026_season_winners_announcement_is_newest_entry() -> None: ...
-def test_existing_announcements_are_unchanged() -> None: ...
-```
+`body` is a non-empty string, `date` is an ISO-8601 `YYYY-MM-DD` string, `tags` is a `list[str]`.
 
 ## Out of scope
-- Verifying, recalculating or changing any standings, scores, rankings or leaderboards.
-- Any change to the League, Cup, Events, Outing, API Data or overview pages.
-- Scorecard images, photos, video or links to match records inside the announcement.
+
+- Verifying, recalculating or changing any standings, scores or leaderboards.
+- Changes to the League, Cup, Events, Outing, API Data or other dashboard pages.
+- Adding scorecard images, photos or links to match records in the announcement.
 - Announcing team, outing or any other award not named in the intent.
-- Translating the announcement or adding a language selector.
-- Renaming or editing the existing `张维` scorecard filenames, or reconciling the two spellings anywhere outside this announcement.
-- Changing, removing or re-wording any announcement that already exists on the page.
-- Adding new dependencies, data sources, persistence or scheduled jobs.
-- Adding a date, headline style or layout beyond what the existing per-entry render path already shows.
+- Translating the announcement into additional languages.
+- Adding the winners announcement to the saved announcements list, or any persistence/export/import behaviour for it.
+- Changing the stored announcement schema or storage format.
+- Adding new styling, badges or layout behaviour to the announcement renderer.
 
 ## Open questions
-- The intent does not show the existing announcement entry shape. Assumption: entries are `dict[str, str]` mappings rendered from `title` and `body`, and the new entry uses exactly those same keys, adding no key (for example, no `date`) that existing entries do not already have.
-- The exact `title` and `body` copy is not fixed by the intent beyond the two winners, their titles and the 2026 season. Assumption: implementation chooses the wording, constrained by criteria 2–9; no fact outside those is stated.
-- The page's existing announcement collection name is not visible in the intent. Assumption: the existing name is kept as-is and the new entry is prepended; no symbol is renamed.
-- The intent flags 张纬 versus the scorecard spelling 张维. Assumption: the announcement uses `张纬` exactly as given in the intent and all other files keep `张维`; this discrepancy is not resolved here.
-- It is not stated whether the announcement should also be reachable outside the Announcements page. Assumption: it appears only on that page.
+
+- The intent spells the league winner `张纬` while scorecard filenames use `张维`. Assumption: the body uses `张纬` exactly as given; no alias, mapping or scorecard lookup is introduced.
+- Title text is unspecified. Assumption: `🎉 2026 赛季个人冠军公告` as listed in Interfaces.
+- Date is unspecified. Assumption: `2026-09-15`, the season end date stated in the README; the owner may correct it.
+- Author is unspecified. Assumption: `GCO 组委会`, a club/system author independent of the logged-in user.
+- Id format is unspecified. Assumption: the fixed literal `pinned-2026-season-winners`, which no stored announcement uses.
+- Tags convention is unspecified. Assumption: `["2026", "冠军"]`; no other field derives from stored data.
+- Exact body wording is unspecified. Assumption: a short congratulatory Chinese notice containing only the two winners, their honours and the 2026 season, with no additional facts.
+- "First" placement is read as before every stored announcement including pinned stored ones. Assumption: yes, index 0 unconditionally.
