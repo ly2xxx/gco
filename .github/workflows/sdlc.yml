@@ -52,7 +52,7 @@ permissions:
 jobs:
   sdlc:
     if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'sdlc'
-    uses: ly2xxx/.github/.github/workflows/sdlc.yml@main
+    uses: ly2xxx/.github/.github/workflows/sdlc.yml@v1
     with:
       idea: ${{ inputs.idea || github.event.issue.title || '' }}
       feature: ${{ inputs.feature }}
