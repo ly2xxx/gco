@@ -49,12 +49,12 @@ with col1:
     st.page_link("pages/1_📢_Announcements.py", label="查看全部公告 View all announcements →", icon="📢")
 
 with col2:
-    section(st, "⏰", "近期赛事 Upcoming")
     events = load_events()
     today_str = str(datetime.date.today())
     upcoming = sorted([e for e in events if e["date"] >= today_str], key=lambda x: x["date"])[:3]
     
     if upcoming:
+        section(st, "⏰", "近期赛事 Upcoming")
         for ev in upcoming:
             st.markdown(f"""
             <div class="gco-card" style="padding:1rem">
@@ -63,10 +63,7 @@ with col2:
                 <div style="color:var(--text-secondary); font-size:.85rem">{ev.get('details', '')}</div>
             </div>
             """, unsafe_allow_html=True)
-    else:
-        st.info("近期暂无赛事 No upcoming events.")
-        
-    st.page_link("pages/2_📅_Events.py", label="查看完整赛历 View full calendar →", icon="📅")
+        st.page_link("pages/2_📅_Events.py", label="查看完整赛历 View full calendar →", icon="📅")
 
 st.markdown("---")
 
