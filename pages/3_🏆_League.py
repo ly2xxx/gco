@@ -8,6 +8,7 @@ import plotly.graph_objects as go
 from theme import inject_theme, hero, section, flash, show_flash, sync_status
 from data import load_scores, save_scores, LEAGUE_TOURNAMENTS, PLAYERS, github_upload_image
 from ai_summary import render_season_summary
+from ai_summary import render_follow_up_questions
 from auth import is_admin_user, get_admin_name
 from datetime import date, datetime
 
@@ -168,7 +169,11 @@ if not p_df.empty:
     c2.metric("最佳净杆", int(p_df['Net_Score'].min()))
     c3.metric("总小鸟数", int(p_df['Birdies'].sum()))
     c4.metric("总老鹰数", int(p_df['Eagles'].sum()))
-    render_season_summary(selected, p_df.to_dict(orient="records"))
+    player_name = selected
+    season_rounds = p_df.to_dict(orient="records")
+    summary = render_season_summary(player_name, season_rounds)
+    if summary:
+        render_follow_up_questions(player_name, season_rounds, summary)
 
     fig_trend = go.Figure()
     fig_trend.add_trace(go.Scatter(
