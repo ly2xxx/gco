@@ -169,17 +169,28 @@ def summarize_season(
 
 
 def render_season_summary(player_name: str, season_rounds: list[dict]) -> None:
-    """Render the '🤖 AI 赛季总结' button and, after a press, the summary or a readable error."""
+    """Render the language selector beside the '🤖 AI 赛季总结' button and, after a press, the summary or a readable error."""
     if not player_name:
         return
-    if not st.button(AI_SUMMARY_BUTTON_LABEL, key="ai_season_summary_button"):
+    language_column, button_column = st.columns([1, 1])
+    with language_column:
+        language = st.radio(
+            LANGUAGE_SELECTOR_LABEL,
+            options=LANGUAGE_OPTIONS,
+            index=0,
+            key=LANGUAGE_SELECTOR_KEY,
+            horizontal=True,
+        )
+    with button_column:
+        pressed = st.button(AI_SUMMARY_BUTTON_LABEL, key="ai_season_summary_button")
+    if not pressed:
         return
     if _round_count(season_rounds) == 0:
         st.warning(NO_ROUNDS_MESSAGE)
         return
     with st.spinner("正在生成赛季总结…"):
         try:
-            summary = summarize_season(player_name, season_rounds)
+            summary = summarize_season(player_name, season_rounds, language)
         except AISummaryError as exc:
             st.error(str(exc))
         else:
