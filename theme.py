@@ -62,7 +62,12 @@ html, body, [data-testid="stAppViewContainer"] {
 [data-testid="stDataFrame"] { border-radius: var(--radius); overflow: hidden; }
 
 /* ── Buttons ──────────────────────────────────── */
-.stButton > button {
+.stButton > button,
+[data-testid="stFormSubmitButton"] button,
+[data-testid="stDownloadButton"] button,
+[data-testid="stBaseButton-secondaryFormSubmit"],
+button[kind="formSubmit"],
+button[kind="secondaryFormSubmit"] {
     background: linear-gradient(135deg, var(--green-mid), var(--green-light)) !important;
     color: #fff !important;
     border: none !important;
@@ -70,7 +75,12 @@ html, body, [data-testid="stAppViewContainer"] {
     font-weight: 600 !important;
     transition: transform .15s, box-shadow .15s;
 }
-.stButton > button:hover {
+.stButton > button:hover,
+[data-testid="stFormSubmitButton"] button:hover,
+[data-testid="stDownloadButton"] button:hover,
+[data-testid="stBaseButton-secondaryFormSubmit"]:hover,
+button[kind="formSubmit"]:hover,
+button[kind="secondaryFormSubmit"]:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(82,183,136,.35) !important;
 }
