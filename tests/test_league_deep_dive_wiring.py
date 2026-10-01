@@ -12,7 +12,9 @@ import pytest  # noqa: E402
 from streamlit.runtime.pages_manager import PagesManager  # noqa: E402
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
-PAGE_PATH = Path("pages/3_🏆_League.py")
+# Absolute: Streamlit 1.64 resolves a relative AppTest.from_file() path against this file,
+# not the working directory.
+PAGE_PATH = REPO_ROOT / "pages" / "3_🏆_League.py"
 PLAYER = "刘北南"
 
 
