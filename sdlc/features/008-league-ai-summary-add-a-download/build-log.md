@@ -35,3 +35,21 @@
 **Deviations:**
 - The same repo-root `sys.path` insertion as Phase 1 before `import ai_summary`.
 - Two small test helpers beyond the plan's four, `_seed()` (writes the stored history the plan's tests describe) and `_markdown_bodies()` (the `markdown` bodies behaviour 15 compares); the plan's helpers and assertions are otherwise as written.
+
+## Phase 3: Green styling for submit and download buttons
+**Status:** done. **Builder:** Claude Code (sdlc-github skill).
+**Files changed:** `theme.py`, `tests/test_theme_button_styles.py` (new).
+
+In `THEME_CSS` only the two button selector lines changed, each widened to the plan's six selectors (`.stButton > button` first, then the form-submit and download button elements); the comment, both declaration blocks and every other rule are byte-identical. `tests/test_theme_button_styles.py` has the plan's constants, `_rules()`/`_rule_for()`/`_approved_theme_css()` helpers and its three tests.
+
+- `uv run pytest tests/test_theme_button_styles.py -v` (Verify): exit 0, 3 passed; `test_non_button_rules_are_unchanged` ran against the approved tag (not skipped).
+- `uv run pytest -q` (Verify): exit 0, 154 passed. Same results on Streamlit 1.64.
+- `behave --format progress`: 17 scenarios passed.
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 008-league-ai-summary-add-a-download --phase 3`: exit 0, PASSED.
+- `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`: 0.
+- Browser check (not committed): the same mocked League page on Streamlit 1.64 rerun after this change. Computed styles of `[data-testid="stFormSubmitButton"] button` (提问 / Ask) and `[data-testid="stDownloadButton"] button` (⬇️ 下载 / Download) are now `linear-gradient(135deg, rgb(45, 106, 79), rgb(82, 183, 136))` with `rgb(255, 255, 255)` text. Before this phase they were `background-image: none` with pale text. Both downloads still hold the expected transcript.
+
+**Deviations:**
+- The same repo-root `sys.path` insertion as Phases 1 and 2 before `import theme`.
+- `_approved_theme_css()` passes `cwd=REPO_ROOT` to `git show`, so the comparison reads this repository wherever pytest is started from; otherwise as written.
+- A `NEW_BUTTON_SELECTORS` tuple holds the two selector fragments the first test loops over (the plan lists them inline).
