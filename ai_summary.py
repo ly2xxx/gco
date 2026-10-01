@@ -44,6 +44,7 @@ PROMPT_INSTRUCTION_EN: str = (
 FOLLOW_UP_INPUT_LABEL: str = "追问赛季总结 / Ask a follow-up question"
 FOLLOW_UP_BUTTON_LABEL: str = "提问 / Ask"
 FOLLOW_UP_INPUT_KEY: str = "ai_season_follow_up_question"
+FOLLOW_UP_FORM_KEY: str = "ai_season_follow_up_form"
 FOLLOW_UP_HISTORY_KEY: str = "ai_season_follow_up_history"
 FOLLOW_UP_HISTORY_MAX_TURNS: int = 6
 EMPTY_QUESTION_MESSAGE: str = "请先输入问题再提交。"
@@ -322,3 +323,38 @@ def render_season_summary(player_name: str, season_rounds: list[dict]) -> str:
             return ""
         st.markdown(summary)
         return summary
+
+
+@st.fragment
+def render_follow_up_questions(
+    player_name: str,
+    season_rounds: list[dict],
+    summary: str,
+) -> None:
+    """Render the stored Q&A turns, the question input and its submit button for this
+    summary, and on submit display the answer or a readable message."""
+    if not summary:
+        return
+    history = get_follow_up_history(summary)
+    for turn in history:
+        st.markdown(f"**{turn.get('question', '')}**")
+        st.markdown(str(turn.get("answer", "")))
+    with st.form(FOLLOW_UP_FORM_KEY, clear_on_submit=True):
+        question = st.text_input(FOLLOW_UP_INPUT_LABEL, key=FOLLOW_UP_INPUT_KEY)
+        submitted = st.form_submit_button(FOLLOW_UP_BUTTON_LABEL)
+    if not submitted:
+        return
+    if not question or not str(question).strip():
+        st.warning(EMPTY_QUESTION_MESSAGE)
+        return
+    language = st.session_state.get(LANGUAGE_SELECTOR_KEY, DEFAULT_LANGUAGE)
+    with st.spinner("正在生成回答…"):
+        try:
+            answer = answer_follow_up_question(
+                player_name, season_rounds, summary, history, question, language
+            )
+        except AISummaryError as exc:
+            st.error(str(exc))
+            return
+    append_follow_up_turn(summary, question, answer)
+    st.markdown(answer)

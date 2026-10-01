@@ -25,3 +25,16 @@
 
 **Deviations:**
 - The same repo-root `sys.path` insertion as Phase 1 before `import ai_summary`; the plan's helpers are otherwise verbatim.
+
+## Phase 3: The `render_follow_up_questions` fragment
+**Status:** done. **Builder:** Claude Code (sdlc-github skill).
+**Files changed:** `ai_summary.py`, `tests/test_ai_follow_up_ui.py` (new).
+
+`ai_summary.py` gains `FOLLOW_UP_FORM_KEY` (next to the other `FOLLOW_UP_*` constants) and the plan's `@st.fragment` `render_follow_up_questions()` directly below `render_season_summary()`, verbatim: it renders the stored turns, a `st.form` with the question input and 提问 / Ask button, and on submit shows the answer (storing the turn) or a readable message. `tests/test_ai_follow_up_ui.py` has the plan's helpers (calling the function through `__wrapped__`, which `st.fragment` sets on both Streamlit 1.55 and 1.64) and its twelve tests.
+
+- `uv run pytest tests/test_ai_follow_up_ui.py tests/test_ai_follow_up_logic.py tests/test_ai_season_summary_return.py -v` (Verify): exit 0, 33 passed.
+- The same files and the whole suite (`python -m pytest -q`: 132 passed; `behave --format progress`: 17 scenarios passed) pass on Streamlit 1.55 and 1.64.
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 007-follow-up-q-a-under-the --phase 3`: exit 0, PASSED.
+
+**Deviations:**
+- The same repo-root `sys.path` insertion as Phases 1 and 2; one helper, `_patch()`, holds the `st` / `get_ai_config` / `_call_ollama_chat` patching every test in the plan describes.
