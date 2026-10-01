@@ -6,8 +6,10 @@ st.secrets.get(..., default) pattern as auth._allowed_tokens().
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.request
+from datetime import datetime
 
 import streamlit as st
 
@@ -62,6 +64,19 @@ MISSING_ROUNDS_NOTE_EN: str = (
     "Note: no round data is available for this question; answer from the season "
     "summary and the earlier Q&A only."
 )
+
+DOWNLOAD_BUTTON_LABEL: str = "⬇️ 下载 / Download"
+DOWNLOAD_BUTTON_KEY: str = "ai_season_summary_download"
+TRANSCRIPT_MIME_TYPE: str = "text/plain"
+TRANSCRIPT_FILE_EXTENSION: str = ".txt"
+TRANSCRIPT_FILENAME_PREFIX: str = "gco_league_ai_summary"
+TRANSCRIPT_SUMMARY_HEADING: str = "AI 赛季总结 / AI Season Summary"
+TRANSCRIPT_QA_HEADING: str = "追问与回答 / Follow-up Q&A"
+
+_HTML_BREAK_RE = re.compile(r"<br\s*/?>", re.IGNORECASE)
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_UNSAFE_FILENAME_CHARS = re.compile(r'[\\/:*?"<>|]')
+_FILENAME_WHITESPACE_RE = re.compile(r"\s+")
 
 
 class AISummaryError(Exception):
@@ -293,6 +308,79 @@ def append_follow_up_turn(summary: str, question: str, answer: str) -> None:
         return
 
 
+def _transcript_safe_text(value: object) -> str:
+    """None -> "", <br>/<br/> -> newline, every other HTML tag removed, "```" removed,
+    surrounding whitespace stripped. Never raises."""
+    if value is None:
+        return ""
+    try:
+        text = str(value)
+    except Exception:
+        return ""
+    text = _HTML_BREAK_RE.sub("\n", text)
+    text = _HTML_TAG_RE.sub("", text)
+    text = text.replace("```", "")
+    return text.strip()
+
+
+def _transcript_turns(history: object) -> list[dict]:
+    """The dict entries of history in stored order; [] when history is None, is not a
+    list, or holds non-dict entries. Never raises."""
+    if not isinstance(history, list):
+        return []
+    return [turn for turn in history if isinstance(turn, dict)]
+
+
+def build_transcript_text(
+    player_name: str,
+    summary: str,
+    history: list[dict] | None,
+) -> str:
+    """Return the plain-text transcript: TRANSCRIPT_SUMMARY_HEADING, the sanitized
+    summary, TRANSCRIPT_QA_HEADING, then every turn with a non-empty sanitized question
+    and answer that is not an exact (question, answer) duplicate of an earlier turn, in
+    stored order, as '问 / Q: <question>' followed by '答 / A: <answer>'. The result ends
+    with a single newline. player_name is accepted for interface symmetry with
+    build_transcript_filename and is not written into the text. Never raises."""
+    parts: list[str] = [
+        TRANSCRIPT_SUMMARY_HEADING,
+        "",
+        _transcript_safe_text(summary),
+        "",
+        TRANSCRIPT_QA_HEADING,
+    ]
+    seen: set[tuple[str, str]] = set()
+    for turn in _transcript_turns(history):
+        question = _transcript_safe_text(turn.get("question"))
+        answer = _transcript_safe_text(turn.get("answer"))
+        if not question or not answer:
+            continue
+        key = (question, answer)
+        if key in seen:
+            continue
+        seen.add(key)
+        parts.append("")
+        parts.append(f"问 / Q: {question}")
+        parts.append(f"答 / A: {answer}")
+    return "\n".join(parts).rstrip() + "\n"
+
+
+def build_transcript_filename(player_name: str, timestamp: datetime) -> str:
+    """Return '<TRANSCRIPT_FILENAME_PREFIX>_<sanitized player name>_<YYYYMMDD_HHMMSS>.txt'.
+    The stem is never empty and the result never contains / \\ : * ? " < > |. Never raises."""
+    stem = _UNSAFE_FILENAME_CHARS.sub("", _transcript_safe_text(player_name))
+    stem = _FILENAME_WHITESPACE_RE.sub("_", stem).strip("._")
+    if not stem:
+        stem = "player"
+    try:
+        stamp = timestamp.strftime("%Y%m%d_%H%M%S")
+    except Exception:
+        stamp = ""
+    if not stamp:
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"{TRANSCRIPT_FILENAME_PREFIX}_{stem}_{stamp}{TRANSCRIPT_FILE_EXTENSION}"
+
+
 def render_season_summary(player_name: str, season_rounds: list[dict]) -> str:
     """Render the language selector beside the '🤖 AI 赛季总结' button and, after a press,
     the summary or a readable error. Returns the summary text that was rendered, or ""
@@ -331,9 +419,9 @@ def render_follow_up_questions(
     season_rounds: list[dict],
     summary: str,
 ) -> None:
-    """Render the stored Q&A turns, the question input and its submit button for this
-    summary, and on submit display the answer or a readable message."""
-    if not summary:
+    """Render the stored Q&A turns, the question form, then a download button for the
+    summary plus every answered turn read at that point in the render. Returns None."""
+    if not str(summary or "").strip():
         return
     history = get_follow_up_history(summary)
     for turn in history:
@@ -342,19 +430,26 @@ def render_follow_up_questions(
     with st.form(FOLLOW_UP_FORM_KEY, clear_on_submit=True):
         question = st.text_input(FOLLOW_UP_INPUT_LABEL, key=FOLLOW_UP_INPUT_KEY)
         submitted = st.form_submit_button(FOLLOW_UP_BUTTON_LABEL)
-    if not submitted:
-        return
-    if not question or not str(question).strip():
-        st.warning(EMPTY_QUESTION_MESSAGE)
-        return
-    language = st.session_state.get(LANGUAGE_SELECTOR_KEY, DEFAULT_LANGUAGE)
-    with st.spinner("正在生成回答…"):
-        try:
-            answer = answer_follow_up_question(
-                player_name, season_rounds, summary, history, question, language
-            )
-        except AISummaryError as exc:
-            st.error(str(exc))
-            return
-    append_follow_up_turn(summary, question, answer)
-    st.markdown(answer)
+    if submitted:
+        if not question or not str(question).strip():
+            st.warning(EMPTY_QUESTION_MESSAGE)
+        else:
+            language = st.session_state.get(LANGUAGE_SELECTOR_KEY, DEFAULT_LANGUAGE)
+            with st.spinner("正在生成回答…"):
+                try:
+                    answer = answer_follow_up_question(
+                        player_name, season_rounds, summary, history, question, language
+                    )
+                except AISummaryError as exc:
+                    st.error(str(exc))
+                else:
+                    append_follow_up_turn(summary, question, answer)
+                    st.markdown(answer)
+    history = get_follow_up_history(summary)
+    st.download_button(
+        label=DOWNLOAD_BUTTON_LABEL,
+        data=build_transcript_text(player_name, summary, history),
+        file_name=build_transcript_filename(player_name, datetime.now()),
+        mime=TRANSCRIPT_MIME_TYPE,
+        key=DOWNLOAD_BUTTON_KEY,
+    )
