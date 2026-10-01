@@ -15,3 +15,23 @@
 **Deviations:**
 - The new test module inserts the repository root into `sys.path` before `import ai_summary as m`, as features 005–007's tests do: the Verify block runs `uv run pytest tests/...`, whose `sys.path` holds `tests/` but not the root.
 - `build_transcript_filename`'s docstring writes the backslash as `\\` instead of the plan's bare `\ `, which Python 3.12 reports as an invalid escape sequence (`SyntaxWarning`). The docstring's value is the same string.
+
+## Phase 2: Render the download control inside the follow-up fragment
+**Status:** done. **Builder:** Claude Code (sdlc-github skill).
+**Files changed:** `ai_summary.py`, `tests/test_ai_follow_up_download_ui.py` (new).
+
+`render_follow_up_questions()` now has the plan's body. The guard for a blank summary runs before any session-state read. An empty question or an AI error now shows its message and carries on instead of returning. After the form, the history is read again and one `st.download_button` (`⬇️ 下载 / Download`, `text/plain`, `gco_league_ai_summary_<player>_<timestamp>.txt`) offers `build_transcript_text()` for that history. `tests/test_ai_follow_up_download_ui.py` has the plan's `FakeStreamlit`, `make_fake_st`, `_call` and `_render` and its six tests (eight cases with the blank-summary parametrization).
+
+- `uv run pytest tests/test_ai_follow_up_download_ui.py tests/test_ai_follow_up_ui.py tests/test_ai_follow_up_logic.py tests/test_league_follow_up_wiring.py -v` (Verify): exit 0, 37 passed. Same result on Streamlit 1.64.
+- Whole suite: `python -m pytest -q`: 151 passed; `behave --format progress`: 17 scenarios passed, on Streamlit 1.55 and 1.64.
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 008-league-ai-summary-add-a-download --phase 2`: exit 0, PASSED.
+- `flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics`: 0.
+- Browser check (not committed): the real League page on Streamlit 1.64 with only `get_ai_config` and `_call_ollama_chat` stubbed, driven by Playwright/Chromium.
+  - Download before any question: `gco_league_ai_summary_刘北南_<timestamp>.txt`, holding the two headings and the summary.
+  - Download after two follow-up questions: both `问 / Q:`/`答 / A:` pairs, in the order asked.
+  - After each download click the summary and every turn stayed on screen (the click reruns only the fragment).
+  - The live DOM shows the buttons Phase 3 targets: `[data-testid="stFormSubmitButton"] button` (`kind="secondaryFormSubmit"`) and `[data-testid="stDownloadButton"] button`. Both are still unstyled (`background-image: none`).
+
+**Deviations:**
+- The same repo-root `sys.path` insertion as Phase 1 before `import ai_summary`.
+- Two small test helpers beyond the plan's four, `_seed()` (writes the stored history the plan's tests describe) and `_markdown_bodies()` (the `markdown` bodies behaviour 15 compares); the plan's helpers and assertions are otherwise as written.

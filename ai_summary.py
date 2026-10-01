@@ -419,9 +419,9 @@ def render_follow_up_questions(
     season_rounds: list[dict],
     summary: str,
 ) -> None:
-    """Render the stored Q&A turns, the question input and its submit button for this
-    summary, and on submit display the answer or a readable message."""
-    if not summary:
+    """Render the stored Q&A turns, the question form, then a download button for the
+    summary plus every answered turn read at that point in the render. Returns None."""
+    if not str(summary or "").strip():
         return
     history = get_follow_up_history(summary)
     for turn in history:
@@ -430,19 +430,26 @@ def render_follow_up_questions(
     with st.form(FOLLOW_UP_FORM_KEY, clear_on_submit=True):
         question = st.text_input(FOLLOW_UP_INPUT_LABEL, key=FOLLOW_UP_INPUT_KEY)
         submitted = st.form_submit_button(FOLLOW_UP_BUTTON_LABEL)
-    if not submitted:
-        return
-    if not question or not str(question).strip():
-        st.warning(EMPTY_QUESTION_MESSAGE)
-        return
-    language = st.session_state.get(LANGUAGE_SELECTOR_KEY, DEFAULT_LANGUAGE)
-    with st.spinner("正在生成回答…"):
-        try:
-            answer = answer_follow_up_question(
-                player_name, season_rounds, summary, history, question, language
-            )
-        except AISummaryError as exc:
-            st.error(str(exc))
-            return
-    append_follow_up_turn(summary, question, answer)
-    st.markdown(answer)
+    if submitted:
+        if not question or not str(question).strip():
+            st.warning(EMPTY_QUESTION_MESSAGE)
+        else:
+            language = st.session_state.get(LANGUAGE_SELECTOR_KEY, DEFAULT_LANGUAGE)
+            with st.spinner("正在生成回答…"):
+                try:
+                    answer = answer_follow_up_question(
+                        player_name, season_rounds, summary, history, question, language
+                    )
+                except AISummaryError as exc:
+                    st.error(str(exc))
+                else:
+                    append_follow_up_turn(summary, question, answer)
+                    st.markdown(answer)
+    history = get_follow_up_history(summary)
+    st.download_button(
+        label=DOWNLOAD_BUTTON_LABEL,
+        data=build_transcript_text(player_name, summary, history),
+        file_name=build_transcript_filename(player_name, datetime.now()),
+        mime=TRANSCRIPT_MIME_TYPE,
+        key=DOWNLOAD_BUTTON_KEY,
+    )
