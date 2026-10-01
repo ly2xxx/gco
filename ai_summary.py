@@ -27,6 +27,20 @@ MISSING_CONFIG_MESSAGE: str = "AI 服务未配置：请在 secrets 中设置 OLL
 NO_ROUNDS_MESSAGE: str = "该球员本赛季暂无比赛轮次，无法生成赛季总结。"
 EMPTY_RESPONSE_MESSAGE: str = "AI 服务未返回有效内容，请稍后重试。"
 CALL_FAILED_MESSAGE: str = "生成赛季总结失败，请稍后重试。（{detail}）"
+LANGUAGE_CHINESE: str = "中文"
+LANGUAGE_ENGLISH: str = "English"
+LANGUAGE_OPTIONS: tuple[str, str] = (LANGUAGE_CHINESE, LANGUAGE_ENGLISH)
+DEFAULT_LANGUAGE: str = LANGUAGE_CHINESE
+LANGUAGE_SELECTOR_LABEL: str = "语言 / Language"
+LANGUAGE_SELECTOR_KEY: str = "ai_season_summary_language"
+SYSTEM_MESSAGE_EN: str = (
+    "You are a golf club data analysis assistant. Always write in English."
+)
+PROMPT_INSTRUCTION_EN: str = (
+    "Using only this player's own data above, write a season summary in English, "
+    "2-3 paragraphs, analysing overall performance, highlights and areas to improve. "
+    "Do not invent data and do not mention other players."
+)
 
 
 class AISummaryError(Exception):
@@ -56,26 +70,49 @@ def _round_count(season_rounds) -> int:
         return 0
 
 
-def build_summary_prompt(player_name: str, season_rounds: list[dict]) -> str:
-    """Return the chat prompt containing only this player's name and rounds."""
+def normalize_language(language: str | None) -> str:
+    """Return LANGUAGE_ENGLISH only for LANGUAGE_ENGLISH, otherwise LANGUAGE_CHINESE. Never raises."""
+    if language == LANGUAGE_ENGLISH:
+        return LANGUAGE_ENGLISH
+    return LANGUAGE_CHINESE
+
+
+def build_summary_prompt(
+    player_name: str,
+    season_rounds: list[dict],
+    language: str = DEFAULT_LANGUAGE,
+) -> str:
+    """Return the chat prompt containing only this player's name and rounds, written in the selected language."""
     rounds = season_rounds
     if hasattr(rounds, "to_dict"):
         rounds = rounds.to_dict(orient="records")
-    lines = [f"球员姓名：{player_name}", "该球员本赛季的比赛轮次数据（每一行是一轮）："]
+    english = normalize_language(language) == LANGUAGE_ENGLISH
+    if english:
+        lines = [
+            f"Player name: {player_name}",
+            "This player's rounds this season (one line per round):",
+        ]
+    else:
+        lines = [f"球员姓名：{player_name}", "该球员本赛季的比赛轮次数据（每一行是一轮）："]
     for index, record in enumerate(rounds, start=1):
         fields = "；".join(f"{key}={value}" for key, value in dict(record).items())
-        lines.append(f"第 {index} 轮：{fields}")
-    lines.append(PROMPT_INSTRUCTION)
+        lines.append(f"Round {index}: {fields}" if english else f"第 {index} 轮：{fields}")
+    lines.append(PROMPT_INSTRUCTION_EN if english else PROMPT_INSTRUCTION)
     return "\n".join(lines)
 
 
-def _call_ollama_chat(api_key: str, model: str, prompt: str) -> str:
+def _call_ollama_chat(
+    api_key: str,
+    model: str,
+    prompt: str,
+    system_message: str = SYSTEM_MESSAGE,
+) -> str:
     """Single seam for the outbound Ollama Cloud chat request; never reads secrets."""
     payload = {
         "model": model,
         "stream": False,
         "messages": [
-            {"role": "system", "content": SYSTEM_MESSAGE},
+            {"role": "system", "content": system_message},
             {"role": "user", "content": prompt},
         ],
     }
@@ -109,15 +146,23 @@ def _call_ollama_chat(api_key: str, model: str, prompt: str) -> str:
     return content.strip()
 
 
-def summarize_season(player_name: str, season_rounds: list[dict]) -> str:
-    """Return the Chinese season summary for one player, or raise AISummaryError."""
+def summarize_season(
+    player_name: str,
+    season_rounds: list[dict],
+    language: str = DEFAULT_LANGUAGE,
+) -> str:
+    """Return the season summary for one player in the selected language, or raise AISummaryError."""
     api_key, model = get_ai_config()
     if not api_key or not model:
         raise AISummaryError(MISSING_CONFIG_MESSAGE)
     if _round_count(season_rounds) == 0:
         raise AISummaryError(NO_ROUNDS_MESSAGE)
-    prompt = build_summary_prompt(player_name, season_rounds)
-    text = _call_ollama_chat(api_key, model, prompt)
+    selected = normalize_language(language)
+    prompt = build_summary_prompt(player_name, season_rounds, selected)
+    if selected == LANGUAGE_ENGLISH:
+        text = _call_ollama_chat(api_key, model, prompt, system_message=SYSTEM_MESSAGE_EN)
+    else:
+        text = _call_ollama_chat(api_key, model, prompt)
     if not text or not text.strip():
         raise AISummaryError(EMPTY_RESPONSE_MESSAGE)
     return text.strip()
