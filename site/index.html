@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GCO 高尔夫球会 · GCO Golf Club</title>
+  <meta name="description" content="GCO 是一个以华人球友为主的业余高尔夫社群。GCO is an amateur golf community of Chinese golfers based around Glasgow, Scotland.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
+  <style>
+    :root {
+      color-scheme: dark;
+      --green-dark: #1a3a2a;
+      --green-mid: #2d6a4f;
+      --green-light: #52b788;
+      --gold: #d4af37;
+      --surface0: #0f1f17;
+      --surface1: #162b1f;
+      --surface3: #26503a;
+      --text-primary: #e8f5ee;
+      --text-secondary: #a8c5b0;
+      --text-muted: #6b9a7a;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--surface0);
+      color: var(--text-primary);
+      font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+        "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      line-height: 1.6;
+    }
+
+    main {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 2.5rem 1rem 3rem;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, var(--green-dark) 0%, var(--green-mid) 60%, var(--surface0) 100%);
+      border: 1px solid var(--green-mid);
+      border-radius: 16px;
+      padding: 2.5rem 1.5rem;
+      text-align: center;
+    }
+    .hero::before {
+      content: "⛳";
+      position: absolute;
+      top: -1rem;
+      right: 1rem;
+      font-size: 8rem;
+      opacity: .06;
+    }
+    .season {
+      margin: 0;
+      color: var(--gold);
+      font-weight: 600;
+      letter-spacing: .04em;
+    }
+    h1 {
+      margin: .25rem 0 0;
+      color: #fff;
+      font-size: clamp(1.9rem, 6vw, 2.6rem);
+      font-weight: 800;
+    }
+    .lead {
+      max-width: 36rem;
+      margin: 1rem auto 0;
+      color: var(--text-secondary);
+    }
+    .lead + .lead { margin-top: .5rem; }
+
+    h2 {
+      margin: 2.5rem 0 1rem;
+      font-size: 1.25rem;
+      color: var(--text-primary);
+    }
+    h2 span { color: var(--text-muted); font-weight: 500; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+      gap: 1rem;
+    }
+    .card {
+      background: var(--surface1);
+      border: 1px solid var(--surface3);
+      border-radius: 12px;
+      padding: 1.25rem;
+    }
+    .card h3 {
+      margin: 0 0 .4rem;
+      font-size: 1.05rem;
+    }
+    .card p {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: .92rem;
+    }
+    .card p + p { margin-top: .35rem; color: var(--text-muted); }
+
+    .spirit {
+      margin: 2.5rem 0 0;
+      padding: 1.25rem 1.5rem;
+      border-left: 3px solid var(--gold);
+      background: var(--surface1);
+      border-radius: 0 12px 12px 0;
+      color: var(--text-secondary);
+    }
+    .spirit p { margin: 0; }
+    .spirit p + p { margin-top: .4rem; }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .75rem;
+      margin-top: 2.5rem;
+    }
+    .links a {
+      display: inline-block;
+      padding: .65rem 1.2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      text-decoration: none;
+      color: #fff;
+      background: linear-gradient(135deg, var(--green-mid), var(--green-light));
+    }
+    .links a.secondary {
+      background: transparent;
+      border: 1px solid var(--surface3);
+      color: var(--text-primary);
+    }
+    .links a:hover { filter: brightness(1.1); }
+    .links a:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+    footer {
+      margin-top: 3rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: .85rem;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <p class="season">2026 赛季 · Season</p>
+      <h1>GCO 高尔夫球会</h1>
+      <p class="lead">
+        GCO 是一个以华人球友为主的业余高尔夫社群。我们以球会友，在苏格兰格拉斯哥一带的球场切磋球技、结交朋友，也在微信群里分享每一轮的成绩与故事。
+      </p>
+      <p class="lead">
+        GCO is an amateur golf community of Chinese golfers based around Glasgow, Scotland —
+        friends who meet on the course to compete, improve and enjoy the game together.
+      </p>
+    </header>
+
+    <h2>我们怎么打 <span>How we play</span></h2>
+    <section class="cards">
+      <article class="card">
+        <h3>🏆 个人联赛 League</h3>
+        <p>6 轮 18 洞比杆赛，按净杆数累计积分。</p>
+        <p>Six rounds of 18-hole stroke play, ranked on net score.</p>
+      </article>
+      <article class="card">
+        <h3>🥊 个人杯赛 Cup</h3>
+        <p>抽签单淘汰比洞赛，一对一决出杯赛冠军。</p>
+        <p>A drawn knockout match-play bracket, settled head to head.</p>
+      </article>
+      <article class="card">
+        <h3>🔴⚫ 红黑对抗 Team Match</h3>
+        <p>红黑两队各 6 人，双人赛与四人赛争夺团队奖杯。</p>
+        <p>Red vs Black, six a side, in pairs and four-man scramble events.</p>
+      </article>
+      <article class="card">
+        <h3>🏅 年终总决赛 Season Final</h3>
+        <p>联赛前三与杯赛冠军 36 洞比杆，决出年度总冠军。</p>
+        <p>The league's top three and the cup winner play 36 holes for the title.</p>
+      </article>
+    </section>
+
+    <section class="spirit">
+      <p>遵守 R&amp;A 高尔夫规则与球场礼仪：修球痕、耙沙坑、不慢打，尊重每一位对手。</p>
+      <p>We play by the R&amp;A Rules of Golf and look after the course and each other. Have fun!</p>
+    </section>
+
+    <nav class="links" aria-label="Project links">
+      <a href="https://github.com/ly2xxx/gco#readme">项目说明 README</a>
+      <a class="secondary" href="https://github.com/ly2xxx/gco">GitHub 仓库 Repository</a>
+    </nav>
+
+    <footer>GCO Golf Club © 2026</footer>
+  </main>
+</body>
+</html>

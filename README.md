@@ -4,6 +4,8 @@ This repository tracks the scoring, announcements, and match management for the 
 
 ## 🎯 Live Dashboard
 
+**🌐 [GCO Community Page](https://ly2xxx.github.io/gco/)** - A short introduction to the GCO Chinese golf community
+
 **📊 [Interactive Statistics Dashboard](http://localhost:8501)** - Run locally for full interactive experience
 
 **📈 [Google Sheets Data](https://docs.google.com/spreadsheets/d/1ZvtWd8zHMI0k2GQGMWhtFHl5xuDbciOW/htmlview)** - View raw data
@@ -158,6 +160,7 @@ gco/
 │   ├── 3_🏆_League.py
 │   ├── 4_🥊_Cup.py
 │   └── 5_🤝_Team.py
+├── site/index.html           # GitHub Pages intro (ly2xxx.github.io/gco)
 ├── data/                     # Local JSON/CSV data storage
 ├── pyproject.toml            # uv project configuration
 ├── requirements.txt          # Shared dependencies
