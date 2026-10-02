@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GCO 高尔夫球会 · GCO Golf Club</title>
+  <meta name="description" content="GCO 是格拉斯哥及周边的华人高尔夫爱好者社区。GCO is a Chinese golf community in and around Glasgow, Scotland.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⛳</text></svg>">
+  <style>
+    :root {
+      --green-mid:   #2d6a4f;
+      --green-light: #52b788;
+      --gold:        #d4af37;
+      --surface0:    #0f1f17;
+      --surface1:    #162b1f;
+      --surface2:    #1e3d2c;
+      --surface3:    #26503a;
+      --text-primary:   #e8f5ee;
+      --text-secondary: #a8c5b0;
+      --text-muted:     #6b9a7a;
+      --radius: 12px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--surface0);
+      color: var(--text-primary);
+      font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB",
+                   "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      line-height: 1.65;
+    }
+
+    main {
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 16px 3rem;
+    }
+
+    a { color: var(--green-light); }
+    a:hover { color: var(--gold); }
+
+    .hero {
+      padding: 4rem 0 2.5rem;
+      text-align: center;
+      border-bottom: 1px solid var(--surface3);
+    }
+    .hero .flag { font-size: 3rem; line-height: 1; }
+    .hero h1 {
+      margin: .75rem 0 .25rem;
+      font-size: clamp(1.9rem, 6vw, 2.8rem);
+      font-weight: 800;
+      letter-spacing: -.01em;
+    }
+    .hero h1 span { color: var(--gold); }
+    .hero .tagline {
+      margin: 0;
+      color: var(--text-secondary);
+      font-size: 1.05rem;
+    }
+
+    section { padding-top: 2.25rem; }
+    h2 {
+      margin: 0 0 .75rem;
+      font-size: 1.15rem;
+      color: var(--gold);
+    }
+    p { margin: 0 0 .9rem; }
+    .en { color: var(--text-secondary); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+    }
+    @media (max-width: 560px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--surface1);
+      border: 1px solid var(--surface3);
+      border-radius: var(--radius);
+      padding: 1.1rem 1.2rem;
+    }
+    .card .icon { font-size: 1.6rem; }
+    .card h3 { margin: .35rem 0 .2rem; font-size: 1rem; }
+    .card p { margin: 0; font-size: .9rem; color: var(--text-secondary); }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--surface3);
+      text-align: center;
+      font-size: .85rem;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <div class="flag" aria-hidden="true">⛳</div>
+      <h1>GCO <span>高尔夫球会</span></h1>
+      <p class="tagline">格拉斯哥华人高尔夫社区 · A Chinese golf community in Glasgow, Scotland</p>
+    </header>
+
+    <section>
+      <h2>关于我们 About us</h2>
+      <p>GCO 是一群生活在苏格兰格拉斯哥及周边地区、热爱高尔夫的华人球友。我们在高尔夫的故乡以球会友，每个赛季一起打联赛、杯赛和红黑团队对抗赛，在球场上切磋球技，在球场外结下友谊。</p>
+      <p class="en">GCO is a group of Chinese golfers living in and around Glasgow. Here in the home of golf we play a full season together, from April to September, with a league, a knockout cup and a Red vs Black team match. The scores matter, but the friendships made on the course matter more.</p>
+    </section>
+
+    <section>
+      <h2>赛季赛事 The season</h2>
+      <div class="grid">
+        <div class="card">
+          <div class="icon" aria-hidden="true">🏆</div>
+          <h3>个人联赛 League</h3>
+          <p>6 轮 18 洞比杆赛，按净杆积分排名。<br>Six rounds of stroke play, ranked on net score.</p>
+        </div>
+        <div class="card">
+          <div class="icon" aria-hidden="true">🥊</div>
+          <h3>个人杯赛 Cup</h3>
+          <p>12 人抽签单淘汰比洞赛。<br>A 12-player knockout match-play draw.</p>
+        </div>
+        <div class="card">
+          <div class="icon" aria-hidden="true">🤝</div>
+          <h3>团队赛 Team Match</h3>
+          <p>红队 vs 黑队，三场双人赛加一场四人赛争夺团队奖杯。<br>Red vs Black over three pairs matches and a four-man scramble.</p>
+        </div>
+        <div class="card">
+          <div class="icon" aria-hidden="true">🥇</div>
+          <h3>年终总决赛 Grand Final</h3>
+          <p>36 洞比杆赛决出赛季总冠军。<br>36 holes of stroke play to crown the champion.</p>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>赛季成绩、公告和赛程由 GCO 赛事看板管理。<br>Scores, announcements and fixtures are kept in the GCO dashboard.</p>
+      <p><a href="https://github.com/ly2xxx/gco#readme">GitHub · ly2xxx/gco</a></p>
+    </footer>
+  </main>
+</body>
+</html>
