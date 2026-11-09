@@ -15,3 +15,19 @@
 - `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 012-league-scorecard-auto-fill-reads-every --phase 1` → **Result: PASSED** (scope: 2 files, all inside the targets; frozen: none touched; contract matches the approved tag)
 
 **Deviations from the plan:** none.
+
+## Phase 2: Read every player from one image
+
+**Status:** passed (local `sdlc_stage.py verify --phase 2`, exit 0)
+
+**Files changed:**
+- `league_scorecard.py`
+- `tests/test_league_scorecard_players_read.py` (new)
+
+**What was built:** `read_league_scorecard_players` sends one image with `SCORECARD_PLAYERS_PROMPT` and returns a `LeagueScorecardPlayersResult` listing every player as `{"label", "fields"}`. It reuses feature 011's transport (`/api/generate`, Bearer key, 120 s, `format: json`) and never raises. Empty or unsupported input, transport errors, an unparseable body and a card with no readable players all come back as an `unavailable_reason`. The single-player `read_league_scorecard` is unchanged.
+
+**Commands and results:**
+- `python -m pytest tests/test_league_scorecard_players_read.py -q` → 8 passed
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 012-league-scorecard-auto-fill-reads-every --phase 2` → **Result: PASSED** (scope: all inside the targets; frozen: none touched; contract matches the approved tag; Phase 1-2 Verify blocks and the whole suite passed)
+
+**Deviations from the plan:** none.
