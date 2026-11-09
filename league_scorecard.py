@@ -119,6 +119,13 @@ class ScorecardReadResult:
     unavailable_reason: str | None = None
 
 
+@dataclass(frozen=True)
+class ScorecardPlayerEntry:
+    index: int
+    label: str
+    found_fields: dict[str, ScorecardFieldValue]
+
+
 def normalize_field_name(name: object) -> str | None:
     """Map a raw extracted key (English, Chinese or a common alias) to its canonical field."""
     text = str(name).strip().casefold().replace("-", "_").replace(" ", "_").replace("／", "_")
@@ -239,6 +246,65 @@ def scorecard_field_updates(
             continue
         found[field] = converted
     return {k: found[k] for k in LEAGUE_SCORECARD_FIELD_KEYS if k in found}
+
+
+_PLAYER_LABEL_KEYS: tuple[str, ...] = (
+    "label",
+    "player",
+    "name",
+    "player_name",
+    "printed_label",
+    "column_header",
+    "header",
+    "column",
+    "text",
+)
+
+
+def _player_label(record: Mapping[str, object]) -> str | None:
+    """The printed label for one parsed player record, or None when it has none."""
+    for key in _PLAYER_LABEL_KEYS:
+        raw = record.get(key)
+        if raw is None or isinstance(raw, (list, tuple, set, dict)):
+            continue
+        text = str(raw).strip()
+        if text:
+            return text
+    return None
+
+
+def _player_fields(record: Mapping[str, object]) -> dict[str, ScorecardFieldValue]:
+    """Normalised score fields for one parsed player record."""
+    for key in ("fields", "found_fields", "scores"):
+        nested = record.get(key)
+        if isinstance(nested, AbcMapping):
+            return scorecard_field_updates(nested)
+    return scorecard_field_updates(record)
+
+
+def scorecard_player_entries(parsed: Mapping[str, object]) -> list[ScorecardPlayerEntry]:
+    """Players from a parsed multi-player league-scorecard response, in printed order.
+
+    Each parsed player supplies a label and score fields. Labels are preserved exactly
+    as read. Duplicate labels remain separate entries with distinct indexes.
+    Missing or malformed ``players`` data returns an empty list.
+    """
+    if not isinstance(parsed, AbcMapping):
+        return []
+    raw_players = parsed.get("players")
+    if not isinstance(raw_players, (list, tuple)):
+        return []
+    entries: list[ScorecardPlayerEntry] = []
+    for raw in raw_players:
+        if not isinstance(raw, AbcMapping):
+            continue
+        label = _player_label(raw)
+        if label is None:
+            continue
+        entries.append(
+            ScorecardPlayerEntry(index=len(entries), label=label, found_fields=_player_fields(raw))
+        )
+    return entries
 
 
 # ---------------------------------------------------------------- Ollama Cloud read
