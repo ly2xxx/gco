@@ -10,13 +10,16 @@ from data import load_scores, save_scores, LEAGUE_TOURNAMENTS, PLAYERS, github_u
 from ai_summary import render_season_summary
 from ai_summary import render_follow_up_questions
 from auth import is_admin_user, get_admin_name
+from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
 from league_scorecard import (
     LEAGUE_SCORECARD_FIELD_KEYS,
-    ScorecardReadResult,
-    apply_scorecard_updates,
-    read_league_scorecard,
+    LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY,
+    LeagueScorecardPlayersResult,
+    ScorecardPlayerEntry,
+    apply_selected_player_scorecard_updates,
+    read_league_scorecard_players,
     scorecard_field_updates,
     scorecard_upload_fingerprint,
     venue_names_from_records,
@@ -38,7 +41,11 @@ LEAGUE_SCORECARD_WIDGET_KEYS: dict[str, str] = {
 LEAGUE_SCORECARD_UPLOAD_KEY = "league_scorecard_upload"
 LEAGUE_SCORECARD_LAST_READ_KEY = "league_scorecard_last_read"
 LEAGUE_SCORECARD_NOTICE_KEY = "league_scorecard_notice"
-LEAGUE_SCORECARD_PREFILL_KEY = "league_scorecard_prefill"
+LEAGUE_SCORECARD_PLAYERS_KEY = "league_scorecard_players"
+LEAGUE_SCORECARD_APPLIED_PICK_KEY = "league_scorecard_applied_pick"
+LEAGUE_SCORECARD_PLAYER_PLACEHOLDER = "选择记分卡上的球员 / Choose the player on the card"
+# Card-level facts: a player read without them takes the card's date and venue.
+LEAGUE_SCORECARD_CARD_FIELDS = ("date", "venue")
 LEAGUE_SCORECARD_SNAPSHOT_KEY = "league_sc_defaults_snapshot"
 AUTOFILL_UNAVAILABLE_NOTICE = "Auto-fill from the scorecard image was unavailable — please enter the values manually."
 # Image types Save uploads from the picker: the form's original JPG/PNG plus the other
@@ -70,6 +77,45 @@ def _scorecard_known_venues() -> list[str]:
 
 def _scorecard_defaults_snapshot(**base: object) -> tuple[str, ...]:
     return tuple(f"{name}={value!r}" for name, value in sorted(base.items()))
+
+
+def _scorecard_players_for_form(result: LeagueScorecardPlayersResult) -> LeagueScorecardPlayersResult:
+    """Each player's fields as the form uses them.
+
+    The venue is matched to a venue already used in league rounds. A player read
+    without the card's date or venue takes them from the card (the first player
+    that has them); a player's own scores are never borrowed from another player.
+    """
+    if not result.players:
+        return result
+    card: dict[str, object] = {}
+    for player in result.players:
+        for field in LEAGUE_SCORECARD_CARD_FIELDS:
+            if field in player.found_fields and field not in card:
+                card[field] = player.found_fields[field]
+    known_venues = _scorecard_known_venues()
+    players = [
+        replace(
+            player,
+            found_fields=scorecard_field_updates(
+                {**{f: v for f, v in card.items() if f not in player.found_fields}, **player.found_fields},
+                known_venues=known_venues,
+            ),
+        )
+        for player in result.players
+    ]
+    return LeagueScorecardPlayersResult(players, result.unavailable_reason)
+
+
+def _scorecard_duplicate_suffix(players: list[ScorecardPlayerEntry], index: int) -> str:
+    """Suffix " (n)" when a printed label repeats on the card, so each entry stays selectable.
+
+    Streamlit maps a selectbox choice back by its shown text, so two identical
+    labels would otherwise both select the first of them. Unique labels get "".
+    """
+    label = players[index].label
+    same = [p.index for p in players if p.label == label]
+    return f" ({same.index(index) + 1})" if len(same) > 1 else ""
 
 
 st.set_page_config(page_title="GCO | 联赛", page_icon="🏆", layout="wide")
@@ -364,47 +410,88 @@ if is_admin_user():
         # defaults, and one round's prefill must never carry over to another.
         _snapshot = _scorecard_defaults_snapshot(round=(t_sel, p_sel, g_sel), **_base_values)
         if st.session_state.get(LEAGUE_SCORECARD_SNAPSHOT_KEY) != _snapshot:
-            for _key in LEAGUE_SCORECARD_WIDGET_KEYS.values():
-                st.session_state.pop(_key, None)
+            # Write the round's values instead of dropping the keys: the browser keeps
+            # showing a keyed widget's old value unless it is set through st.session_state.
+            for _field, _key in LEAGUE_SCORECARD_WIDGET_KEYS.items():
+                st.session_state[_key] = _base_values[_field]
+            # The card's player pick belongs to the round it was made for.
+            st.session_state[LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY] = None
+            st.session_state.pop(LEAGUE_SCORECARD_APPLIED_PICK_KEY, None)
             st.session_state[LEAGUE_SCORECARD_SNAPSHOT_KEY] = _snapshot
 
+        # A new card is read once; every player found on it is kept for the picker below.
+        widget_keys = LEAGUE_SCORECARD_WIDGET_KEYS
+        players_result = LeagueScorecardPlayersResult([])
         if uploaded_scorecard is not None:
-            payload = uploaded_scorecard.getvalue()
-            fingerprint = scorecard_upload_fingerprint(uploaded_scorecard.name, payload)
+            image_bytes = uploaded_scorecard.getvalue()
+            mime_type = uploaded_scorecard.type
+            fingerprint = scorecard_upload_fingerprint(uploaded_scorecard.name, image_bytes)
             if st.session_state.get(LEAGUE_SCORECARD_LAST_READ_KEY) != fingerprint:
                 st.session_state[LEAGUE_SCORECARD_LAST_READ_KEY] = fingerprint
                 with st.spinner("正在识别记分卡… Reading the scorecard…"):
-                    result: ScorecardReadResult = read_league_scorecard(payload, uploaded_scorecard.type)
-                updates = scorecard_field_updates(result.found_fields, known_venues=_scorecard_known_venues())
-                if result.unavailable_reason is not None or not updates:
+                    players_result: LeagueScorecardPlayersResult = read_league_scorecard_players(image_bytes, mime_type)
+                players_result = _scorecard_players_for_form(players_result)
+                st.session_state[LEAGUE_SCORECARD_PLAYERS_KEY] = players_result
+                # A new card starts with nobody picked and the round's own values in the form.
+                st.session_state[LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY] = None
+                st.session_state.pop(LEAGUE_SCORECARD_APPLIED_PICK_KEY, None)
+                for _field, _key in widget_keys.items():
+                    st.session_state[_key] = _base_values[_field]
+                if players_result.unavailable_reason is not None or not players_result.players:
                     st.session_state[LEAGUE_SCORECARD_NOTICE_KEY] = AUTOFILL_UNAVAILABLE_NOTICE
-                    st.session_state[LEAGUE_SCORECARD_PREFILL_KEY] = {}
                 else:
                     st.session_state.pop(LEAGUE_SCORECARD_NOTICE_KEY, None)
-                    st.session_state[LEAGUE_SCORECARD_PREFILL_KEY] = dict(updates)
                 st.rerun()
+            players_result = st.session_state.get(LEAGUE_SCORECARD_PLAYERS_KEY) or players_result
         else:
             st.session_state[LEAGUE_SCORECARD_NOTICE_KEY] = AUTOFILL_UNAVAILABLE_NOTICE
             # Selecting the same card again after clearing it is a new, manual read.
             st.session_state.pop(LEAGUE_SCORECARD_LAST_READ_KEY, None)
+            st.session_state.pop(LEAGUE_SCORECARD_PLAYERS_KEY, None)
 
         if st.session_state.get(LEAGUE_SCORECARD_NOTICE_KEY):
             st.info(st.session_state[LEAGUE_SCORECARD_NOTICE_KEY])
 
-        # Apply a successful read once, before the widgets render; fields it didn't
-        # find keep the value they already had.
-        _prefill = st.session_state.pop(LEAGUE_SCORECARD_PREFILL_KEY, {}) or {}
-        if "date" in _prefill:
-            try:
-                _prefill["date"] = date.fromisoformat(str(_prefill["date"]))
-            except ValueError:
-                _prefill.pop("date")
-        _applied = apply_scorecard_updates(_prefill, LEAGUE_SCORECARD_WIDGET_KEYS, st.session_state)
-        if _applied:
-            st.success(
-                f"🤖 已根据记分卡自动填写 {len(_applied)} 项，请核对后保存。 "
-                f"Auto-filled from the scorecard: {', '.join(_applied)}. Check them, then Save."
+        # Every player read off the card, labelled as printed; the admin picks whose scores to use.
+        selected_index: int | None = None
+        if players_result.players:
+            selected_index: int | None = st.selectbox(
+                "Player",
+                options=[player.index for player in players_result.players],
+                format_func=lambda index: players_result.players[index].label
+                + _scorecard_duplicate_suffix(players_result.players, index),
+                index=None,
+                key=LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY,
+                placeholder=LEAGUE_SCORECARD_PLAYER_PLACEHOLDER,
             )
+            # Apply only when the pick (or the card) changes, before the form's widgets
+            # render. Every other rerun, Save included, keeps the form as the admin left it.
+            _pick = (st.session_state.get(LEAGUE_SCORECARD_LAST_READ_KEY), selected_index)
+            if st.session_state.get(LEAGUE_SCORECARD_APPLIED_PICK_KEY) != _pick:
+                st.session_state[LEAGUE_SCORECARD_APPLIED_PICK_KEY] = _pick
+                _applied = apply_selected_player_scorecard_updates(
+                    players_result,
+                    selected_index,
+                    widget_keys,
+                    st.session_state,
+                )
+                if "date" in _applied:
+                    try:
+                        st.session_state[widget_keys["date"]] = date.fromisoformat(
+                            str(st.session_state[widget_keys["date"]])
+                        )
+                    except ValueError:
+                        _applied.remove("date")
+                # Fields the picked player has none of show the round's own values again,
+                # never the previous pick's (written, so the browser updates them too).
+                for _field in LEAGUE_SCORECARD_FIELD_KEYS:
+                    if _field not in _applied:
+                        st.session_state[widget_keys[_field]] = _base_values[_field]
+                if _applied:
+                    st.success(
+                        f"🤖 已根据记分卡自动填写 {len(_applied)} 项，请核对后保存。 "
+                        f"Auto-filled from the scorecard: {', '.join(_applied)}. Check them, then Save."
+                    )
 
         # The picker's image is the scorecard Save uploads, when it is an image type.
         scorecard_pic = (
