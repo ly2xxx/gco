@@ -34,3 +34,20 @@
 **Deviations from the plan:**
 1. **No `num_predict` in the payload's `options`; it is `{"temperature": 0}`.** The plan capped output at 512 tokens. Ollama counts a thinking model's reasoning towards `num_predict`, so the cap can end a vision read before it writes the JSON, turning every read into `unparseable response`; the call proven in ideas-playground#16 sets no cap. No Definition of done test checks `options`.
 2. **Tests isolate model and key resolution.** `tests/test_league_scorecard_read.py` has an autouse fixture that clears `OLLAMA_SCORECARD_MODEL`, `OLLAMA_MODEL`, `OLLAMA_API_KEY` and `OLLAMA_KEY` and replaces `streamlit.secrets` with `{}`, so `test_request_payload_and_timeout` checks the default model even on a machine whose `.streamlit/secrets.toml` sets `OLLAMA_MODEL`. The plan's tests are otherwise as written.
+
+## Phase 3: Session-state application and upload fingerprint
+
+**Status:** passed (local `sdlc_stage.py verify --phase 3`, exit 0)
+
+**Files changed:**
+- `league_scorecard.py`
+- `tests/test_league_scorecard_state.py` (new)
+
+**What was built:** `apply_scorecard_updates` writes each found field into its widget's session-state key, in `LEAGUE_SCORECARD_FIELD_KEYS` order, and ignores unknown fields and fields without a widget key, so fields the read didn't find keep their value. `scorecard_upload_fingerprint` gives one selected file a stable SHA-256 id, which the page uses to read each upload only once.
+
+**Commands and results:**
+- `python -m pytest tests/test_league_scorecard_state.py -v` → 6 passed
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 011-league-admin-score-form-a-scorecard --phase 3` → **Result: PASSED** (scope: all inside the targets; frozen: none touched; contract matches the approved tag; whole suite and the Phase 1-3 Verify blocks passed)
+
+**Deviations from the plan:**
+1. **One extra test, `test_fingerprint_accepts_empty_payload`,** covers the `bytes(payload or b"")` guard the plan specifies for an empty or `None` payload. The plan's four tests are as written.

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
 import math
 import os
@@ -10,10 +11,11 @@ import socket
 import urllib.error
 import urllib.request
 from collections.abc import Mapping as AbcMapping
+from collections.abc import MutableMapping as AbcMutableMapping  # noqa: F401
 from dataclasses import dataclass
 from datetime import date, datetime
 from difflib import get_close_matches
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
 ScorecardFieldValue = str | int
 
@@ -417,3 +419,28 @@ def read_league_scorecard(
     if not found:
         return ScorecardReadResult({}, "no readable fields")
     return ScorecardReadResult(found)
+
+
+# ---------------------------------------------------------------- session state
+
+def apply_scorecard_updates(
+    updates: Mapping[str, ScorecardFieldValue],
+    widget_keys: Mapping[str, str],
+    session_state: MutableMapping[str, Any],
+) -> list[str]:
+    """Write each found field into its widget's session-state key; return the fields written.
+
+    Fields without a widget key, and keys that aren't target fields, are ignored.
+    Calling it twice with the same arguments leaves the same state.
+    """
+    applied: list[str] = []
+    for field in LEAGUE_SCORECARD_FIELD_KEYS:
+        if field in updates and field in widget_keys:
+            session_state[widget_keys[field]] = updates[field]
+            applied.append(field)
+    return applied
+
+
+def scorecard_upload_fingerprint(file_name: str, payload: bytes) -> str:
+    """Stable id of one selected file, so the same upload is read only once."""
+    return hashlib.sha256(str(file_name).encode("utf-8") + b"\x00" + bytes(payload or b"")).hexdigest()
