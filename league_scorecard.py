@@ -4,10 +4,13 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import math
 import os
 import re
 import socket
+import sys
+import time
 import urllib.error
 import urllib.request
 from collections.abc import Mapping as AbcMapping
@@ -21,6 +24,36 @@ from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 # file but a running Streamlit app keeps the imported module, so pages compare this
 # with the file on disk and reload the module when they differ.
 LOADED_FROM_MTIME: float = os.path.getmtime(__file__)
+
+# ---------------------------------------------------------------- logging
+# Every Ollama scorecard read logs what it sent, how long it took and what came back,
+# so a failed auto-fill can be traced in the app's logs (Streamlit Cloud: Manage app).
+# The API key is never logged; the model's reply is logged up to LOG_EXCERPT_CHARS.
+LOGGER_NAME = "gco.scorecard"
+LOG_EXCERPT_CHARS = 2000
+
+
+def _scorecard_logger() -> logging.Logger:
+    """INFO-level logger writing to stderr, which Streamlit Cloud shows in the app's logs."""
+    logger = logging.getLogger(LOGGER_NAME)
+    if not logger.handlers:  # the logger outlives module reloads: add the handler once
+        handler = logging.StreamHandler(sys.stderr)
+        handler.setFormatter(logging.Formatter("%(asctime)s [scorecard] %(levelname)s %(message)s"))
+        logger.addHandler(handler)
+        logger.setLevel(logging.INFO)
+        logger.propagate = False
+    return logger
+
+
+log = _scorecard_logger()
+
+
+def _excerpt(text: object, limit: int = LOG_EXCERPT_CHARS) -> str:
+    """``text`` on one line, cut to ``limit`` characters with a note of how much was cut."""
+    flat = " ".join(str(text).split())
+    if len(flat) <= limit:
+        return flat
+    return f"{flat[:limit]}… (+{len(flat) - limit} chars)"
 
 ScorecardFieldValue = str | int
 
@@ -441,25 +474,86 @@ def _ollama_api_key() -> str | None:
     return _configured_value(API_KEY_ENV_NAMES)
 
 
+def _prompt_kind(payload: Mapping[str, Any]) -> str:
+    prompt = payload.get("prompt")
+    if prompt == SCORECARD_PLAYERS_PROMPT:
+        return "players"
+    if prompt == SCORECARD_PROMPT:
+        return "single"
+    return "custom"
+
+
+def _describe_ollama_body(body: str) -> str:
+    """Ollama's completion stats and the model's reply text, for the log. Never raises."""
+    try:
+        outer = json.loads(body)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return f"body is not JSON: {_excerpt(body)}"
+    if not isinstance(outer, dict):
+        return f"body is JSON but not an object: {_excerpt(body)}"
+    stats = []
+    for key in ("model", "done", "done_reason", "prompt_eval_count", "eval_count"):
+        if key in outer:
+            stats.append(f"{key}={outer[key]}")
+    for key in ("total_duration", "load_duration", "eval_duration"):
+        if isinstance(outer.get(key), (int, float)):
+            stats.append(f"{key}={outer[key] / 1e9:.1f}s")
+    thinking = outer.get("thinking")
+    if isinstance(thinking, str) and thinking:
+        stats.append(f"thinking_chars={len(thinking)}")
+    if "error" in outer:
+        stats.append(f"error={_excerpt(outer['error'], 500)}")
+    reply = outer.get("response")
+    reply_text = reply if isinstance(reply, str) else json.dumps(reply, ensure_ascii=False)
+    return f"{' '.join(stats) or 'no stats'} | reply ({len(str(reply_text))} chars): {_excerpt(reply_text)}"
+
+
 def _post_ollama_generate(payload: dict[str, Any], timeout_seconds: float) -> str:
     """POST one generate request and return the raw body. No retry."""
     headers = {"Content-Type": "application/json", "Accept": "application/json"}
     api_key = _ollama_api_key()
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
+    data = json.dumps(payload).encode("utf-8")
     request = urllib.request.Request(
         OLLAMA_GENERATE_URL,
-        data=json.dumps(payload).encode("utf-8"),
+        data=data,
         headers=headers,
         method="POST",
     )
+    images = payload.get("images") or []
+    log.info(
+        "ollama request: POST %s model=%s prompt=%s image_b64_chars=%s body_bytes=%s timeout=%ss api_key=%s",
+        OLLAMA_GENERATE_URL, payload.get("model"), _prompt_kind(payload),
+        sum(len(i) for i in images if isinstance(i, str)), len(data), timeout_seconds,
+        "set" if api_key else "MISSING",
+    )
+    started = time.monotonic()
     try:
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
-            return response.read().decode("utf-8", errors="replace")
+            body = response.read().decode("utf-8", errors="replace")
+            log.info(
+                "ollama response: status=%s after %.1fs, %s chars | %s",
+                getattr(response, "status", "?"), time.monotonic() - started, len(body),
+                _describe_ollama_body(body),
+            )
+            return body
     except urllib.error.HTTPError as exc:
+        try:
+            detail = exc.read().decode("utf-8", errors="replace")
+        except Exception:
+            detail = ""
+        log.warning(
+            "ollama error: http %s after %.1fs: %s",
+            exc.code, time.monotonic() - started, _excerpt(detail, 1000) or exc.reason,
+        )
         raise ScorecardRequestError(f"http {exc.code}") from exc
     except (urllib.error.URLError, TimeoutError, socket.timeout, OSError) as exc:
         reason = "timeout" if isinstance(exc, (TimeoutError, socket.timeout)) else "network error"
+        log.warning(
+            "ollama error: %s after %.1fs (limit %ss): %r",
+            reason, time.monotonic() - started, timeout_seconds, exc,
+        )
         raise ScorecardRequestError(reason) from exc
 
 
@@ -531,6 +625,38 @@ def read_league_scorecard(
     return ScorecardReadResult(found)
 
 
+def _explain_unparseable(body: str) -> str:
+    """Why a generate body gave no JSON object, for the log. Never raises."""
+    try:
+        outer = json.loads(body)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return "the body is not JSON"
+    if not isinstance(outer, dict):
+        return f"the body is a JSON {type(outer).__name__}, not an object"
+    if "error" in outer:
+        return f"Ollama returned an error: {_excerpt(outer['error'], 500)}"
+    reply = outer.get("response")
+    if isinstance(reply, str):
+        if not reply.strip():
+            return f"the model's reply is empty (done_reason={outer.get('done_reason')})"
+        return "the model's reply holds no JSON object"
+    return f"no usable 'response' field (keys: {sorted(outer)})"
+
+
+def _describe_parsed_shape(parsed: Mapping[str, object]) -> str:
+    """The shape of a parsed reply that yielded no players, for the log. Never raises."""
+    try:
+        players = parsed.get("players")
+        shape = f"top-level keys={sorted(map(str, parsed))}, players={type(players).__name__}"
+        if isinstance(players, (list, tuple)):
+            shape += f"[{len(players)}]"
+            if players and isinstance(players[0], AbcMapping):
+                shape += f", first record keys={sorted(map(str, players[0]))}"
+        return shape
+    except Exception as exc:  # pragma: no cover - logging must never break a read
+        return f"shape unavailable ({exc!r})"
+
+
 def read_league_scorecard_players(
     image_bytes: bytes,
     mime_type: str | None,
@@ -538,25 +664,51 @@ def read_league_scorecard_players(
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
 ) -> LeagueScorecardPlayersResult:
     """Read every player from one league scorecard image. Never raises."""
+    result = _read_league_scorecard_players(image_bytes, mime_type, timeout_seconds=timeout_seconds)
+    try:
+        if result.unavailable_reason is not None:
+            log.warning("players read: unavailable (%s)", result.unavailable_reason)
+        else:
+            log.info(
+                "players read: %s player(s): %s",
+                len(result.players),
+                "; ".join(f"{p.label!r} -> {p.found_fields}" for p in result.players),
+            )
+    except Exception:  # pragma: no cover - logging must never break a read
+        pass
+    return result
+
+
+def _read_league_scorecard_players(
+    image_bytes: bytes,
+    mime_type: str | None,
+    *,
+    timeout_seconds: float,
+) -> LeagueScorecardPlayersResult:
     if not image_bytes:
         return LeagueScorecardPlayersResult([], "empty image")
     if normalize_mime_type(mime_type, image_bytes) is None:
+        log.warning("players read: %r is not a supported image (sniffed %r)", mime_type, sniff_image_mime(image_bytes))
         return LeagueScorecardPlayersResult([], "unsupported file type")
     try:
         payload = build_scorecard_players_payload(image_bytes, model=_scorecard_model())
         body = _post_ollama_generate(payload, timeout_seconds)
     except ScorecardRequestError as exc:
         return LeagueScorecardPlayersResult([], str(exc) or "service error")
-    except Exception:
+    except Exception as exc:
+        log.exception("players read: unexpected error %r", exc)
         return LeagueScorecardPlayersResult([], "service error")
     parsed = parse_ollama_response(body)
     if parsed is None:
+        log.warning("players read: unparseable response: %s", _explain_unparseable(body))
         return LeagueScorecardPlayersResult([], "unparseable response")
     try:
         players = scorecard_player_entries(parsed)
-    except Exception:
+    except Exception as exc:
+        log.exception("players read: could not build players from %s: %r", _describe_parsed_shape(parsed), exc)
         return LeagueScorecardPlayersResult([], "unparseable response")
     if not players:
+        log.warning("players read: no labelled players in the reply: %s", _describe_parsed_shape(parsed))
         return LeagueScorecardPlayersResult([], "no readable players")
     return LeagueScorecardPlayersResult(players)
 

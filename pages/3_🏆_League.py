@@ -14,6 +14,7 @@ from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
 import importlib
+import logging
 import os
 import league_scorecard
 
@@ -24,6 +25,7 @@ if getattr(league_scorecard, "LOADED_FROM_MTIME", None) != os.path.getmtime(leag
     importlib.reload(league_scorecard)
 
 from league_scorecard import (  # noqa: E402
+    LOGGER_NAME,
     LEAGUE_SCORECARD_FIELD_KEYS,
     LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY,
     LeagueScorecardPlayersResult,
@@ -36,6 +38,7 @@ from league_scorecard import (  # noqa: E402
 )
 
 # ── Scorecard auto-fill (admin score form) ───────────────────────────────────
+scorecard_log = logging.getLogger(LOGGER_NAME)
 LEAGUE_SCORECARD_WIDGET_KEYS: dict[str, str] = {
     "date": "league_sc_date",
     "venue": "league_sc_venue",
@@ -438,6 +441,10 @@ if is_admin_user():
             fingerprint = scorecard_upload_fingerprint(uploaded_scorecard.name, image_bytes)
             if st.session_state.get(LEAGUE_SCORECARD_LAST_READ_KEY) != fingerprint:
                 st.session_state[LEAGUE_SCORECARD_LAST_READ_KEY] = fingerprint
+                scorecard_log.info(
+                    "League form: reading %r (%s bytes, %s) for %s · %s · %s",
+                    uploaded_scorecard.name, len(image_bytes), mime_type, p_sel, t_sel, g_sel,
+                )
                 with st.spinner("正在识别记分卡… Reading the scorecard…"):
                     players_result: LeagueScorecardPlayersResult = read_league_scorecard_players(image_bytes, mime_type)
                 players_result = _scorecard_players_for_form(players_result)
@@ -448,7 +455,12 @@ if is_admin_user():
                 for _field, _key in widget_keys.items():
                     st.session_state[_key] = _base_values[_field]
                 if players_result.unavailable_reason is not None or not players_result.players:
-                    st.session_state[LEAGUE_SCORECARD_NOTICE_KEY] = AUTOFILL_UNAVAILABLE_NOTICE
+                    # The reason (e.g. "timeout", "http 400", "no readable players") is shown to the
+                    # admin; the details are in the app's logs under [scorecard].
+                    st.session_state[LEAGUE_SCORECARD_NOTICE_KEY] = (
+                        f"{AUTOFILL_UNAVAILABLE_NOTICE} "
+                        f"(原因 / reason: {players_result.unavailable_reason or 'no readable players'})"
+                    )
                 else:
                     st.session_state.pop(LEAGUE_SCORECARD_NOTICE_KEY, None)
                 st.rerun()
@@ -497,6 +509,11 @@ if is_admin_user():
                 for _field in LEAGUE_SCORECARD_FIELD_KEYS:
                     if _field not in _applied:
                         st.session_state[widget_keys[_field]] = _base_values[_field]
+                scorecard_log.info(
+                    "League form: picked %s for %s · %s · %s; filled %s",
+                    repr(players_result.players[selected_index].label) if selected_index is not None else "nobody",
+                    p_sel, t_sel, g_sel, _applied or "nothing",
+                )
                 if _applied:
                     st.success(
                         f"🤖 已根据记分卡自动填写 {len(_applied)} 项，请核对后保存。 "
