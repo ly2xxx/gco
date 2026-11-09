@@ -11,6 +11,66 @@ from ai_summary import render_season_summary
 from ai_summary import render_follow_up_questions
 from auth import is_admin_user, get_admin_name
 from datetime import date, datetime
+from typing import Any
+from league_scorecard import (
+    LEAGUE_SCORECARD_FIELD_KEYS,
+    ScorecardReadResult,
+    apply_scorecard_updates,
+    read_league_scorecard,
+    scorecard_field_updates,
+    scorecard_upload_fingerprint,
+    venue_names_from_records,
+)
+
+# ── Scorecard auto-fill (admin score form) ───────────────────────────────────
+LEAGUE_SCORECARD_WIDGET_KEYS: dict[str, str] = {
+    "date": "league_sc_date",
+    "venue": "league_sc_venue",
+    "net": "league_sc_net",
+    "gross": "league_sc_gross",
+    "stableford": "league_sc_stableford",
+    "eagles": "league_sc_eagles",
+    "birdies": "league_sc_birdies",
+    "pars": "league_sc_pars",
+    "bogeys": "league_sc_bogeys",
+    "double_bogeys_or_worse": "league_sc_double_bogeys_or_worse",
+}
+LEAGUE_SCORECARD_UPLOAD_KEY = "league_scorecard_upload"
+LEAGUE_SCORECARD_LAST_READ_KEY = "league_scorecard_last_read"
+LEAGUE_SCORECARD_NOTICE_KEY = "league_scorecard_notice"
+LEAGUE_SCORECARD_PREFILL_KEY = "league_scorecard_prefill"
+LEAGUE_SCORECARD_SNAPSHOT_KEY = "league_sc_defaults_snapshot"
+AUTOFILL_UNAVAILABLE_NOTICE = "Auto-fill from the scorecard image was unavailable — please enter the values manually."
+# Image types Save uploads from the picker: the form's original JPG/PNG plus the other
+# images the scorecard reader accepts (league_scorecard.SUPPORTED_IMAGE_MIME_TYPES).
+SCORECARD_SAVE_EXTENSIONS = ("jpg", "jpeg", "png", "webp", "gif")
+
+
+def _scorecard_widget_default(field: str, fallback: Any) -> dict[str, Any]:
+    """Widget kwargs: the key, plus `fallback` as the value unless session state already holds one.
+
+    Whole-number fields also get step=1: without a value, st.number_input would
+    otherwise turn into a float input (0.00) once the key is in session state.
+    """
+    kwargs: dict[str, Any] = {"key": LEAGUE_SCORECARD_WIDGET_KEYS[field]}
+    if isinstance(fallback, int) and not isinstance(fallback, bool):
+        kwargs["step"] = 1
+    if LEAGUE_SCORECARD_WIDGET_KEYS[field] not in st.session_state:
+        kwargs["value"] = fallback
+    return kwargs
+
+
+def _scorecard_known_venues() -> list[str]:
+    """Venue names already used in league rounds, for matching the venue read off a card."""
+    try:
+        return venue_names_from_records(df[df["Venue"].notna()].to_dict("records"))
+    except Exception:
+        return []
+
+
+def _scorecard_defaults_snapshot(**base: object) -> tuple[str, ...]:
+    return tuple(f"{name}={value!r}" for name, value in sorted(base.items()))
+
 
 st.set_page_config(page_title="GCO | 联赛", page_icon="🏆", layout="wide")
 inject_theme(st)
@@ -269,32 +329,108 @@ if is_admin_user():
             }
             st.info(f"🆕 {p_sel} 的 {g_sel} 暂无成绩，保存后将创建新纪录。 No score recorded yet — saving will create one.")
 
+        # Scorecard picker above the form: a new image is read once and pre-fills the
+        # fields it finds; Save below still uploads it via github_upload_image.
+        uploaded_scorecard = st.file_uploader(
+            "Scorecard image / 记分卡图片（自动填写）", type=None, key=LEAGUE_SCORECARD_UPLOAD_KEY
+        )
+
+        # Today's form defaults: the existing score when editing, otherwise 72/36/0.
+        _base_date = date.today()
+        if "Date" in rec and pd.notna(rec.get("Date")):
+            try:
+                _base_date = datetime.strptime(str(rec["Date"]), "%Y-%m-%d").date()
+            except:
+                pass
+        _base_venue = str(rec.get("Venue", ""))
+        _base_net = int(rec.get("Net_Score", 0))
+        _base_gross = int(rec.get("Gross_Score", 72))
+        _base_stableford = int(rec.get("Stableford", 36))
+        _base_eagles = int(rec.get("Eagles", 0))
+        _base_birdies = int(rec.get("Birdies", 0))
+        _base_pars = int(rec.get("Pars", 0))
+        _base_bogeys = int(rec.get("Bogeys", 0))
+        _base_double_bogeys_or_worse = int(rec.get("Double_Bogeys", 0))
+
+        # A different round (player/game) or a saved score means new defaults: drop the
+        # widgets' stored values before they render so the form shows them.
+        _base_values = {
+            "date": _base_date, "venue": _base_venue, "net": _base_net, "gross": _base_gross,
+            "stableford": _base_stableford, "eagles": _base_eagles, "birdies": _base_birdies,
+            "pars": _base_pars, "bogeys": _base_bogeys,
+            "double_bogeys_or_worse": _base_double_bogeys_or_worse,
+        }
+        # The round itself is part of the snapshot: two unplayed rounds share 72/36/0
+        # defaults, and one round's prefill must never carry over to another.
+        _snapshot = _scorecard_defaults_snapshot(round=(t_sel, p_sel, g_sel), **_base_values)
+        if st.session_state.get(LEAGUE_SCORECARD_SNAPSHOT_KEY) != _snapshot:
+            for _key in LEAGUE_SCORECARD_WIDGET_KEYS.values():
+                st.session_state.pop(_key, None)
+            st.session_state[LEAGUE_SCORECARD_SNAPSHOT_KEY] = _snapshot
+
+        if uploaded_scorecard is not None:
+            payload = uploaded_scorecard.getvalue()
+            fingerprint = scorecard_upload_fingerprint(uploaded_scorecard.name, payload)
+            if st.session_state.get(LEAGUE_SCORECARD_LAST_READ_KEY) != fingerprint:
+                st.session_state[LEAGUE_SCORECARD_LAST_READ_KEY] = fingerprint
+                with st.spinner("正在识别记分卡… Reading the scorecard…"):
+                    result: ScorecardReadResult = read_league_scorecard(payload, uploaded_scorecard.type)
+                updates = scorecard_field_updates(result.found_fields, known_venues=_scorecard_known_venues())
+                if result.unavailable_reason is not None or not updates:
+                    st.session_state[LEAGUE_SCORECARD_NOTICE_KEY] = AUTOFILL_UNAVAILABLE_NOTICE
+                    st.session_state[LEAGUE_SCORECARD_PREFILL_KEY] = {}
+                else:
+                    st.session_state.pop(LEAGUE_SCORECARD_NOTICE_KEY, None)
+                    st.session_state[LEAGUE_SCORECARD_PREFILL_KEY] = dict(updates)
+                st.rerun()
+        else:
+            st.session_state[LEAGUE_SCORECARD_NOTICE_KEY] = AUTOFILL_UNAVAILABLE_NOTICE
+            # Selecting the same card again after clearing it is a new, manual read.
+            st.session_state.pop(LEAGUE_SCORECARD_LAST_READ_KEY, None)
+
+        if st.session_state.get(LEAGUE_SCORECARD_NOTICE_KEY):
+            st.info(st.session_state[LEAGUE_SCORECARD_NOTICE_KEY])
+
+        # Apply a successful read once, before the widgets render; fields it didn't
+        # find keep the value they already had.
+        _prefill = st.session_state.pop(LEAGUE_SCORECARD_PREFILL_KEY, {}) or {}
+        if "date" in _prefill:
+            try:
+                _prefill["date"] = date.fromisoformat(str(_prefill["date"]))
+            except ValueError:
+                _prefill.pop("date")
+        _applied = apply_scorecard_updates(_prefill, LEAGUE_SCORECARD_WIDGET_KEYS, st.session_state)
+        if _applied:
+            st.success(
+                f"🤖 已根据记分卡自动填写 {len(_applied)} 项，请核对后保存。 "
+                f"Auto-filled from the scorecard: {', '.join(_applied)}. Check them, then Save."
+            )
+
+        # The picker's image is the scorecard Save uploads, when it is an image type.
+        scorecard_pic = (
+            uploaded_scorecard
+            if uploaded_scorecard is not None
+            and uploaded_scorecard.name.rsplit(".", 1)[-1].lower() in SCORECARD_SAVE_EXTENSIONS
+            else None
+        )
+
         with st.form("league_score_form"):
             vc1, vc2 = st.columns(2)
-            def_date = date.today()
-            if "Date" in rec and pd.notna(rec.get("Date")):
-                try:
-                    def_date = datetime.strptime(str(rec["Date"]), "%Y-%m-%d").date()
-                except:
-                    pass
-            in_date = vc1.date_input("日期 Date", value=def_date)
-            in_venue = vc2.text_input("场地 Venue", value=str(rec.get("Venue", "")))
+            in_date = vc1.date_input("日期 Date", **_scorecard_widget_default("date", _base_date))
+            in_venue = vc2.text_input("场地 Venue", **_scorecard_widget_default("venue", _base_venue))
 
             sc1, sc2, sc3 = st.columns(3)
-            in_net = sc1.number_input("净杆 Net Score", value=int(rec.get("Net_Score", 0)))
-            in_gross = sc2.number_input("总杆 Gross Score", value=int(rec.get("Gross_Score", 72)))
-            in_stable = sc3.number_input("稳定福分 Stableford", value=int(rec.get("Stableford", 36)))
-            
+            in_net = sc1.number_input("净杆 Net Score", **_scorecard_widget_default("net", _base_net))
+            in_gross = sc2.number_input("总杆 Gross Score", **_scorecard_widget_default("gross", _base_gross))
+            in_stable = sc3.number_input("稳定福分 Stableford", **_scorecard_widget_default("stableford", _base_stableford))
+
             st.write("击球统计 Stats:")
             bc1, bc2, bc3, bc4, bc5 = st.columns(5)
-            in_eg = bc1.number_input("老鹰 Eagle", min_value=0, value=int(rec.get("Eagles", 0)))
-            in_bd = bc2.number_input("小鸟 Birdie", min_value=0, value=int(rec.get("Birdies", 0)))
-            in_par = bc3.number_input("标准 Par", min_value=0, value=int(rec.get("Pars", 0)))
-            in_bg = bc4.number_input("柏忌 Bogey", min_value=0, value=int(rec.get("Bogeys", 0)))
-            in_dbg = bc5.number_input("双柏忌+ D.Bogey+", min_value=0, value=int(rec.get("Double_Bogeys", 0)))
-            
-            st.write("可选：上传计分卡 Optional: Upload Scorecard")
-            scorecard_pic = st.file_uploader("支持格式 / Supported formats: JPG, PNG", type=["jpg", "jpeg", "png"])
+            in_eg = bc1.number_input("老鹰 Eagle", min_value=0, **_scorecard_widget_default("eagles", _base_eagles))
+            in_bd = bc2.number_input("小鸟 Birdie", min_value=0, **_scorecard_widget_default("birdies", _base_birdies))
+            in_par = bc3.number_input("标准 Par", min_value=0, **_scorecard_widget_default("pars", _base_pars))
+            in_bg = bc4.number_input("柏忌 Bogey", min_value=0, **_scorecard_widget_default("bogeys", _base_bogeys))
+            in_dbg = bc5.number_input("双柏忌+ D.Bogey+", min_value=0, **_scorecard_widget_default("double_bogeys_or_worse", _base_double_bogeys_or_worse))
 
             if st.form_submit_button("✅ 保存成绩 Save", width='stretch'):
                 total_holes = in_eg + in_bd + in_par + in_bg + in_dbg
