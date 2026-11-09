@@ -126,6 +126,12 @@ class ScorecardPlayerEntry:
     found_fields: dict[str, ScorecardFieldValue]
 
 
+@dataclass(frozen=True)
+class LeagueScorecardPlayersResult:
+    players: list[ScorecardPlayerEntry]
+    unavailable_reason: str | None = None
+
+
 def normalize_field_name(name: object) -> str | None:
     """Map a raw extracted key (English, Chinese or a common alias) to its canonical field."""
     text = str(name).strip().casefold().replace("-", "_").replace(" ", "_").replace("／", "_")
@@ -332,6 +338,27 @@ SCORECARD_PROMPT: str = (
     "- Use null for any value you cannot read with confidence. Never guess and never invent a value.\n"
     "- Do not add extra keys."
 )
+SCORECARD_PLAYERS_PROMPT: str = (
+    "You read one photographed golf league scorecard that may show several players' scores. "
+    "The card may be printed or handwritten, in Chinese, English, or both.\n"
+    "Return a single JSON object and nothing else, shaped as:\n"
+    '{"players": [{"label": "<text printed for this player>", "fields": {...}}, ...]}\n'
+    "Rules:\n"
+    '- Return one object in "players" for every player printed on the card, in the order the '
+    "players appear on the card. Never drop a player and never list a player twice.\n"
+    '- "label": the player\'s printed name. When no name is printed, use the column header printed '
+    "above that player's scores, exactly as printed. Never invent a label and never use "
+    "A/B/C/Marker.\n"
+    '- "fields": an object holding only the scores that belong to this one player, using any of '
+    '"date", "venue", "net", "gross", "stableford", "eagles", "birdies", "pars", "bogeys", '
+    '"double_bogeys_or_worse".\n'
+    '- "date": the round date as an ISO string "YYYY-MM-DD".\n'
+    '- "venue": the venue/course name exactly as printed on the card.\n'
+    '- "net", "gross", "stableford": integers.\n'
+    '- "eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse": non-negative integer counts.\n'
+    "- Omit any field you cannot read with confidence. Never guess and never invent a value.\n"
+    "- Do not add keys other than \"players\", \"label\" and \"fields\"."
+)
 
 
 class ScorecardRequestError(RuntimeError):
@@ -364,6 +391,18 @@ def build_scorecard_payload(image_bytes: bytes, *, model: str) -> dict[str, Any]
     return {
         "model": model,
         "prompt": SCORECARD_PROMPT,
+        "images": [base64.b64encode(image_bytes).decode("ascii")],
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0},
+    }
+
+
+def build_scorecard_players_payload(image_bytes: bytes, *, model: str) -> dict[str, Any]:
+    """Request body for reading every player on one league scorecard."""
+    return {
+        "model": model,
+        "prompt": SCORECARD_PLAYERS_PROMPT,
         "images": [base64.b64encode(image_bytes).decode("ascii")],
         "stream": False,
         "format": "json",
@@ -485,6 +524,36 @@ def read_league_scorecard(
     if not found:
         return ScorecardReadResult({}, "no readable fields")
     return ScorecardReadResult(found)
+
+
+def read_league_scorecard_players(
+    image_bytes: bytes,
+    mime_type: str | None,
+    *,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> LeagueScorecardPlayersResult:
+    """Read every player from one league scorecard image. Never raises."""
+    if not image_bytes:
+        return LeagueScorecardPlayersResult([], "empty image")
+    if normalize_mime_type(mime_type, image_bytes) is None:
+        return LeagueScorecardPlayersResult([], "unsupported file type")
+    try:
+        payload = build_scorecard_players_payload(image_bytes, model=_scorecard_model())
+        body = _post_ollama_generate(payload, timeout_seconds)
+    except ScorecardRequestError as exc:
+        return LeagueScorecardPlayersResult([], str(exc) or "service error")
+    except Exception:
+        return LeagueScorecardPlayersResult([], "service error")
+    parsed = parse_ollama_response(body)
+    if parsed is None:
+        return LeagueScorecardPlayersResult([], "unparseable response")
+    try:
+        players = scorecard_player_entries(parsed)
+    except Exception:
+        return LeagueScorecardPlayersResult([], "unparseable response")
+    if not players:
+        return LeagueScorecardPlayersResult([], "no readable players")
+    return LeagueScorecardPlayersResult(players)
 
 
 # ---------------------------------------------------------------- session state
