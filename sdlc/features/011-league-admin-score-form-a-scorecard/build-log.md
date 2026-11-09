@@ -76,3 +76,24 @@
 5. **Clearing the picker forgets the last read.** Selecting the same card again after removing it is a new, manual read, so an admin can retry after a timeout. There is still no automatic retry, cache or queue (spec behaviour 18).
 6. **A spinner during the read and a success line after it.** A read can take up to 120 s, and the success line (`已根据记分卡自动填写 N 项… / Auto-filled from the scorecard: …`) tells the admin which fields to check before saving. The unavailable notice is the plan's text and stays `st.info`.
 7. **Four AppTest tests beyond the Definition of done** run the page as an admin with the read, `save_scores` and `github_upload_image` replaced by recorders: no-upload defaults and notice, prefill of found fields only and Save storing the edited values plus one image upload, a failed read leaving the form unchanged, and a round switch replacing the prefill. They skip if the installed Streamlit's AppTest can't drive `st.file_uploader`. The plan's ten source tests are as written.
+
+## Phase 4 fix: Reset the form on every round switch; save WebP/GIF cards
+
+**Status:** passed (local `sdlc_stage.py verify --phase 4`, exit 0)
+
+**Files changed:**
+- `pages/3_🏆_League.py`
+- `tests/test_league_scorecard_wiring.py`
+
+**What was changed:** These fix two concerns from the Ollama review on ly2xxx/gco#46.
+- The reset snapshot now includes the round (`t_sel`, `p_sel`, `g_sel`) as well as its default values. Before, two unplayed rounds shared the same 72/36/0 snapshot, so a card read for one player stayed in the form after switching to another unplayed player, and Save could store it on the wrong round.
+- `SCORECARD_SAVE_EXTENSIONS` now also covers WebP and GIF, the other images the reader accepts. Before, such a card auto-filled the form but was silently not uploaded on Save (spec behaviour 9).
+
+**Commands and results:**
+- `python -m pytest tests/test_league_scorecard_wiring.py -q` → 16 passed. Against the page before this fix, the two new tests fail: `test_switching_between_unplayed_rounds_drops_the_prefill` with `assert (12, 109, 36, 7) == (0, 72, 36, 0)`, and `test_save_uploads_a_webp_scorecard_the_reader_accepted` with no upload.
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 011-league-admin-score-form-a-scorecard --phase 4` → **Result: PASSED** (whole suite 202 passed; Phase 1-4 Verify blocks passed; scope inside the targets; frozen: none touched; contract matches the approved tag)
+
+**Deviations from the plan:**
+1. **The snapshot includes the round** (`_scorecard_defaults_snapshot(round=(t_sel, p_sel, g_sel), **_base_values)`). The plan's snapshot held only the ten default values, which its own Risks section relies on to refresh the form on a round switch, and that misses switches between rounds with identical defaults.
+2. **WebP and GIF scorecards are uploaded on Save.** This extends Phase 4 deviation 1, which limited Save to JPG/JPEG/PNG; nothing in the app reads `scorecard_images/` by file type.
+3. **Two more AppTest tests,** one for each fix above.

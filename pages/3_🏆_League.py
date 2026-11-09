@@ -41,8 +41,9 @@ LEAGUE_SCORECARD_NOTICE_KEY = "league_scorecard_notice"
 LEAGUE_SCORECARD_PREFILL_KEY = "league_scorecard_prefill"
 LEAGUE_SCORECARD_SNAPSHOT_KEY = "league_sc_defaults_snapshot"
 AUTOFILL_UNAVAILABLE_NOTICE = "Auto-fill from the scorecard image was unavailable — please enter the values manually."
-# Extensions the score form's scorecard upload has always accepted; Save uploads only these.
-SCORECARD_SAVE_EXTENSIONS = ("jpg", "jpeg", "png")
+# Image types Save uploads from the picker: the form's original JPG/PNG plus the other
+# images the scorecard reader accepts (league_scorecard.SUPPORTED_IMAGE_MIME_TYPES).
+SCORECARD_SAVE_EXTENSIONS = ("jpg", "jpeg", "png", "webp", "gif")
 
 
 def _scorecard_widget_default(field: str, fallback: Any) -> dict[str, Any]:
@@ -359,7 +360,9 @@ if is_admin_user():
             "pars": _base_pars, "bogeys": _base_bogeys,
             "double_bogeys_or_worse": _base_double_bogeys_or_worse,
         }
-        _snapshot = _scorecard_defaults_snapshot(**_base_values)
+        # The round itself is part of the snapshot: two unplayed rounds share 72/36/0
+        # defaults, and one round's prefill must never carry over to another.
+        _snapshot = _scorecard_defaults_snapshot(round=(t_sel, p_sel, g_sel), **_base_values)
         if st.session_state.get(LEAGUE_SCORECARD_SNAPSHOT_KEY) != _snapshot:
             for _key in LEAGUE_SCORECARD_WIDGET_KEYS.values():
                 st.session_state.pop(_key, None)
@@ -403,7 +406,7 @@ if is_admin_user():
                 f"Auto-filled from the scorecard: {', '.join(_applied)}. Check them, then Save."
             )
 
-        # The picker's image is the scorecard Save uploads, limited to the types it always accepted.
+        # The picker's image is the scorecard Save uploads, when it is an image type.
         scorecard_pic = (
             uploaded_scorecard
             if uploaded_scorecard is not None
