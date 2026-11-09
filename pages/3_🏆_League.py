@@ -13,7 +13,17 @@ from auth import is_admin_user, get_admin_name
 from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
-from league_scorecard import (
+import importlib
+import os
+import league_scorecard
+
+# A redeploy replaces league_scorecard.py, but a running app keeps the module it imported
+# before (sys.modules), so names added since then fail to import until the app reboots.
+# Reload it whenever the file on disk isn't the one it was loaded from.
+if getattr(league_scorecard, "LOADED_FROM_MTIME", None) != os.path.getmtime(league_scorecard.__file__):
+    importlib.reload(league_scorecard)
+
+from league_scorecard import (  # noqa: E402
     LEAGUE_SCORECARD_FIELD_KEYS,
     LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY,
     LeagueScorecardPlayersResult,

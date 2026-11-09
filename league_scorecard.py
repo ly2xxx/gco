@@ -17,6 +17,11 @@ from datetime import date, datetime
 from difflib import get_close_matches
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
 
+# The file this module was loaded from, by modification time. A redeploy replaces the
+# file but a running Streamlit app keeps the imported module, so pages compare this
+# with the file on disk and reload the module when they differ.
+LOADED_FROM_MTIME: float = os.path.getmtime(__file__)
+
 ScorecardFieldValue = str | int
 
 LEAGUE_SCORECARD_FIELD_KEYS: tuple[str, ...] = (
