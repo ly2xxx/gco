@@ -31,3 +31,19 @@
 - `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 012-league-scorecard-auto-fill-reads-every --phase 2` → **Result: PASSED** (scope: all inside the targets; frozen: none touched; contract matches the approved tag; Phase 1-2 Verify blocks and the whole suite passed)
 
 **Deviations from the plan:** none.
+
+## Phase 3: Apply only the selected player's fields
+
+**Status:** passed (local `sdlc_stage.py verify --phase 3`, exit 0)
+
+**Files changed:**
+- `league_scorecard.py`
+- `tests/test_league_scorecard_player_selection.py` (new)
+
+**What was built:** `selected_player_scorecard_updates` returns exactly the chosen entry's fields, selected by `index` so duplicate labels stay distinct, or `{}` with no valid choice. `apply_selected_player_scorecard_updates` clears every scorecard widget key and then writes only the chosen player's present fields. Switching from one player to another therefore never leaves the first player's values behind.
+
+**Commands and results:**
+- `python -m pytest tests/test_league_scorecard_player_selection.py -q` → 8 passed
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 012-league-scorecard-auto-fill-reads-every --phase 3` → **Result: PASSED** (scope: all inside the targets; frozen: none touched; contract matches the approved tag; Phase 1-3 Verify blocks and the whole suite passed)
+
+**Deviations from the plan:** none.

@@ -576,6 +576,41 @@ def apply_scorecard_updates(
     return applied
 
 
+LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY: str = "league_scorecard_selected_player"
+
+
+def selected_player_scorecard_updates(
+    result: LeagueScorecardPlayersResult,
+    selected_index: int | None,
+) -> dict[str, ScorecardFieldValue]:
+    """Fields for exactly the selected entry, or {} when no valid entry is selected."""
+    if selected_index is None or isinstance(selected_index, bool) or not isinstance(selected_index, int):
+        return {}
+    for entry in result.players:
+        if entry.index == selected_index:
+            return dict(entry.found_fields)
+    return {}
+
+
+def apply_selected_player_scorecard_updates(
+    result: LeagueScorecardPlayersResult,
+    selected_index: int | None,
+    widget_keys: Mapping[str, str],
+    session_state: MutableMapping[str, Any],
+) -> list[str]:
+    """Clear the league scorecard widget keys, then write the selected player's present fields.
+
+    Returns the fields written. With no valid selection, all league scorecard widget
+    keys are cleared and an empty list is returned.
+    """
+    for field in LEAGUE_SCORECARD_FIELD_KEYS:
+        key = widget_keys.get(field)
+        if key is not None and key in session_state:
+            del session_state[key]
+    updates = selected_player_scorecard_updates(result, selected_index)
+    return apply_scorecard_updates(updates, widget_keys, session_state)
+
+
 def scorecard_upload_fingerprint(file_name: str, payload: bytes) -> str:
     """Stable id of one selected file, so the same upload is read only once."""
     return hashlib.sha256(str(file_name).encode("utf-8") + b"\x00" + bytes(payload or b"")).hexdigest()
