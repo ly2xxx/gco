@@ -276,3 +276,62 @@ def test_switching_round_shows_that_rounds_values_not_the_prefill(admin_page):
     assert _form_values(at)["gross"] == expected_gross
     assert len(calls["read"]) == 1
     assert at.exception == []
+
+
+def test_switching_between_unplayed_rounds_drops_the_prefill(admin_page):
+    """Two unplayed rounds share the 72/36/0 defaults; a read for one must not follow to the other."""
+    from league_scorecard import ScorecardReadResult
+
+    import data
+
+    at, calls = admin_page
+    scores = data.load_scores()
+
+    def unplayed(player, game):
+        rows = scores[(scores["Player"] == player) & (scores["Game"] == game)]
+        return rows.empty or not (rows["Gross_Score"].fillna(0) > 0).any()
+
+    players = list(_widget(at, "selectbox", "球员 Player").options)
+    pair = next(
+        (
+            (game, [p for p in players if unplayed(p, game)][:2])
+            for game in _widget(at, "selectbox", "轮次 Game").options
+            if sum(unplayed(p, game) for p in players) >= 2
+        ),
+        None,
+    )
+    if pair is None:
+        pytest.skip("no game that two players have both still to play")
+    game, (first, other) = pair
+    _select_round(at, first, game)
+    calls["result"] = ScorecardReadResult({"net": 12, "gross": 109, "bogeys": 7})
+    _widget(at, "file_uploader", "Scorecard image").set_value(("card.png", PNG_BYTES, "image/png"))
+    at.run()
+    assert (_form_values(at)["net"], _form_values(at)["gross"], _form_values(at)["bogeys"]) == (12, 109, 7)
+
+    _widget(at, "selectbox", "球员 Player").select(other)
+    at.run()
+
+    values = _form_values(at)
+    assert (values["net"], values["gross"], values["stableford"], values["bogeys"]) == (0, 72, 36, 0)
+    assert at.exception == []
+
+
+def test_save_uploads_a_webp_scorecard_the_reader_accepted(admin_page):
+    from league_scorecard import ScorecardReadResult
+
+    at, calls = admin_page
+    _select_round(at, PLAYER, _unplayed_game(at, PLAYER))
+    calls["result"] = ScorecardReadResult({"gross": 90})
+    webp = b"RIFF\x00\x00\x00\x00WEBPVP8 " + b"x" * 8
+    _widget(at, "file_uploader", "Scorecard image").set_value(("card.webp", webp, "image/webp"))
+    at.run()
+    _widget(at, "button", "✅ 保存成绩 Save").click()
+    at.run()
+
+    assert len(calls["saved"]) == 1
+    assert len(calls["uploaded"]) == 1
+    content, name = calls["uploaded"][0]
+    assert content == webp
+    assert name.endswith(".webp")
+    assert at.exception == []
