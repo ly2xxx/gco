@@ -119,6 +119,19 @@ class ScorecardReadResult:
     unavailable_reason: str | None = None
 
 
+@dataclass(frozen=True)
+class ScorecardPlayerEntry:
+    index: int
+    label: str
+    found_fields: dict[str, ScorecardFieldValue]
+
+
+@dataclass(frozen=True)
+class LeagueScorecardPlayersResult:
+    players: list[ScorecardPlayerEntry]
+    unavailable_reason: str | None = None
+
+
 def normalize_field_name(name: object) -> str | None:
     """Map a raw extracted key (English, Chinese or a common alias) to its canonical field."""
     text = str(name).strip().casefold().replace("-", "_").replace(" ", "_").replace("／", "_")
@@ -241,6 +254,65 @@ def scorecard_field_updates(
     return {k: found[k] for k in LEAGUE_SCORECARD_FIELD_KEYS if k in found}
 
 
+_PLAYER_LABEL_KEYS: tuple[str, ...] = (
+    "label",
+    "player",
+    "name",
+    "player_name",
+    "printed_label",
+    "column_header",
+    "header",
+    "column",
+    "text",
+)
+
+
+def _player_label(record: Mapping[str, object]) -> str | None:
+    """The printed label for one parsed player record, or None when it has none."""
+    for key in _PLAYER_LABEL_KEYS:
+        raw = record.get(key)
+        if raw is None or isinstance(raw, (list, tuple, set, dict)):
+            continue
+        text = str(raw).strip()
+        if text:
+            return text
+    return None
+
+
+def _player_fields(record: Mapping[str, object]) -> dict[str, ScorecardFieldValue]:
+    """Normalised score fields for one parsed player record."""
+    for key in ("fields", "found_fields", "scores"):
+        nested = record.get(key)
+        if isinstance(nested, AbcMapping):
+            return scorecard_field_updates(nested)
+    return scorecard_field_updates(record)
+
+
+def scorecard_player_entries(parsed: Mapping[str, object]) -> list[ScorecardPlayerEntry]:
+    """Players from a parsed multi-player league-scorecard response, in printed order.
+
+    Each parsed player supplies a label and score fields. Labels are preserved exactly
+    as read. Duplicate labels remain separate entries with distinct indexes.
+    Missing or malformed ``players`` data returns an empty list.
+    """
+    if not isinstance(parsed, AbcMapping):
+        return []
+    raw_players = parsed.get("players")
+    if not isinstance(raw_players, (list, tuple)):
+        return []
+    entries: list[ScorecardPlayerEntry] = []
+    for raw in raw_players:
+        if not isinstance(raw, AbcMapping):
+            continue
+        label = _player_label(raw)
+        if label is None:
+            continue
+        entries.append(
+            ScorecardPlayerEntry(index=len(entries), label=label, found_fields=_player_fields(raw))
+        )
+    return entries
+
+
 # ---------------------------------------------------------------- Ollama Cloud read
 
 OLLAMA_GENERATE_URL = "https://ollama.com/api/generate"
@@ -265,6 +337,27 @@ SCORECARD_PROMPT: str = (
     "non-negative integer counts for this one player only.\n"
     "- Use null for any value you cannot read with confidence. Never guess and never invent a value.\n"
     "- Do not add extra keys."
+)
+SCORECARD_PLAYERS_PROMPT: str = (
+    "You read one photographed golf league scorecard that may show several players' scores. "
+    "The card may be printed or handwritten, in Chinese, English, or both.\n"
+    "Return a single JSON object and nothing else, shaped as:\n"
+    '{"players": [{"label": "<text printed for this player>", "fields": {...}}, ...]}\n'
+    "Rules:\n"
+    '- Return one object in "players" for every player printed on the card, in the order the '
+    "players appear on the card. Never drop a player and never list a player twice.\n"
+    '- "label": the player\'s printed name. When no name is printed, use the column header printed '
+    "above that player's scores, exactly as printed. Never invent a label and never use "
+    "A/B/C/Marker.\n"
+    '- "fields": an object holding only the scores that belong to this one player, using any of '
+    '"date", "venue", "net", "gross", "stableford", "eagles", "birdies", "pars", "bogeys", '
+    '"double_bogeys_or_worse".\n'
+    '- "date": the round date as an ISO string "YYYY-MM-DD".\n'
+    '- "venue": the venue/course name exactly as printed on the card.\n'
+    '- "net", "gross", "stableford": integers.\n'
+    '- "eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse": non-negative integer counts.\n'
+    "- Omit any field you cannot read with confidence. Never guess and never invent a value.\n"
+    "- Do not add keys other than \"players\", \"label\" and \"fields\"."
 )
 
 
@@ -298,6 +391,18 @@ def build_scorecard_payload(image_bytes: bytes, *, model: str) -> dict[str, Any]
     return {
         "model": model,
         "prompt": SCORECARD_PROMPT,
+        "images": [base64.b64encode(image_bytes).decode("ascii")],
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0},
+    }
+
+
+def build_scorecard_players_payload(image_bytes: bytes, *, model: str) -> dict[str, Any]:
+    """Request body for reading every player on one league scorecard."""
+    return {
+        "model": model,
+        "prompt": SCORECARD_PLAYERS_PROMPT,
         "images": [base64.b64encode(image_bytes).decode("ascii")],
         "stream": False,
         "format": "json",
@@ -421,6 +526,36 @@ def read_league_scorecard(
     return ScorecardReadResult(found)
 
 
+def read_league_scorecard_players(
+    image_bytes: bytes,
+    mime_type: str | None,
+    *,
+    timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+) -> LeagueScorecardPlayersResult:
+    """Read every player from one league scorecard image. Never raises."""
+    if not image_bytes:
+        return LeagueScorecardPlayersResult([], "empty image")
+    if normalize_mime_type(mime_type, image_bytes) is None:
+        return LeagueScorecardPlayersResult([], "unsupported file type")
+    try:
+        payload = build_scorecard_players_payload(image_bytes, model=_scorecard_model())
+        body = _post_ollama_generate(payload, timeout_seconds)
+    except ScorecardRequestError as exc:
+        return LeagueScorecardPlayersResult([], str(exc) or "service error")
+    except Exception:
+        return LeagueScorecardPlayersResult([], "service error")
+    parsed = parse_ollama_response(body)
+    if parsed is None:
+        return LeagueScorecardPlayersResult([], "unparseable response")
+    try:
+        players = scorecard_player_entries(parsed)
+    except Exception:
+        return LeagueScorecardPlayersResult([], "unparseable response")
+    if not players:
+        return LeagueScorecardPlayersResult([], "no readable players")
+    return LeagueScorecardPlayersResult(players)
+
+
 # ---------------------------------------------------------------- session state
 
 def apply_scorecard_updates(
@@ -439,6 +574,41 @@ def apply_scorecard_updates(
             session_state[widget_keys[field]] = updates[field]
             applied.append(field)
     return applied
+
+
+LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY: str = "league_scorecard_selected_player"
+
+
+def selected_player_scorecard_updates(
+    result: LeagueScorecardPlayersResult,
+    selected_index: int | None,
+) -> dict[str, ScorecardFieldValue]:
+    """Fields for exactly the selected entry, or {} when no valid entry is selected."""
+    if selected_index is None or isinstance(selected_index, bool) or not isinstance(selected_index, int):
+        return {}
+    for entry in result.players:
+        if entry.index == selected_index:
+            return dict(entry.found_fields)
+    return {}
+
+
+def apply_selected_player_scorecard_updates(
+    result: LeagueScorecardPlayersResult,
+    selected_index: int | None,
+    widget_keys: Mapping[str, str],
+    session_state: MutableMapping[str, Any],
+) -> list[str]:
+    """Clear the league scorecard widget keys, then write the selected player's present fields.
+
+    Returns the fields written. With no valid selection, all league scorecard widget
+    keys are cleared and an empty list is returned.
+    """
+    for field in LEAGUE_SCORECARD_FIELD_KEYS:
+        key = widget_keys.get(field)
+        if key is not None and key in session_state:
+            del session_state[key]
+    updates = selected_player_scorecard_updates(result, selected_index)
+    return apply_scorecard_updates(updates, widget_keys, session_state)
 
 
 def scorecard_upload_fingerprint(file_name: str, payload: bytes) -> str:
