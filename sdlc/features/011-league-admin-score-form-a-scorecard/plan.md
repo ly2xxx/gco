@@ -1,156 +1,237 @@
-<!-- sdlc stage=plan model=deepseek-v4.1-flash:cloud from=intent.md,spec.md@a2eb70e -->
+<!-- sdlc stage=plan model=deepseek-v4.1-flash:cloud from=intent.md,spec.md@88fb6d9 -->
 ## Approach
-Add a small, dependency-free `scorecard_extraction.py` that validates JPG/PNG bytes, calls a fakeable Ollama vision extractor, and returns only confidently extracted fields; then add one page-level upload helper in `pages/3_🏆_League.py` that renders the uploader above the existing League score form, normalises date/venue, and feeds the draft in as editable widget defaults while the existing save path still saves the visible widget values. Failure paths render only a non-blocking League-page notice and return `None`, leaving today’s manual form intact.
+
+Add one new dependency-free helper module, `league_scorecard.py`, that owns every piece of scorecard logic (field filtering/normalisation, the single Ollama Cloud `generate` call with a 120 s cap, and the `st.session_state` application step), so each piece can be unit-tested in-process without Streamlit or network. Then wire `pages/3_🏆_League.py` minimally: a `st.file_uploader` above the ten target fields, one read per selected file (fingerprint-guarded, no retry), a one-shot prefill written into the existing widgets' session-state keys plus an `st.info` notice on any failure, leaving the existing fields, defaults, layout and the Save/`github_upload_image` path untouched.
 
 ## Coverage
 
 | Done when (intent.md) | Spec behaviours | Phase |
 | :-- | :-- | :-- |
-| The League score form shows a JPG/PNG scorecard upload control above the form fields. | 1 | Phase 2 |
-| Uploading a readable scorecard fills in date, venue, net, gross, stableford, and each eagle/birdie/par/bogey/double-bogey count for a card that contains them, without the admin retyping them. | 2, 3, 13, 14 | Phase 1, Phase 2 |
-| Pre-filled values stay editable, and saving stores what the admin sees on screen after any corrections. | 5, 6, 7 | Phase 2 |
-| If there is no upload, the image is unreadable, the file type is unsupported, or the vision service errors or times out, the form still renders with empty manual entry fields, the admin is told auto-fill was unavailable, and no error is shown to players or other pages. | 8, 9, 10, 11, 12 | Phase 1, Phase 2, Phase 3 |
-| Any field the extraction could not determine is left blank for manual entry rather than guessed or defaulted. | 4 | Phase 1 |
-| The existing tests still pass. | 15 | Phase 3 |
+| The League score form shows a scorecard image picker above its fields and is otherwise unchanged in layout, fields and defaults. | 1 | 4 |
+| Reading a scorecard fills only the date, venue, net, gross, stableford and eagle/birdie/par/bogey/double-bogey-or-worse fields the service reports as found, and leaves every other field holding the value it already had (existing score when editing, otherwise the current default). | 2, 3, 4, 5, 6, 17 | 1, 2, 3, 4 |
+| Pre-filled values remain editable, and saving stores what the admin sees on screen after any corrections. | 7, 8 | 3, 4 |
+| Saving still uploads the scorecard image via `github_upload_image`, and a save with no image or a failed upload behaves as it does today. | 9, 10, 11 | 4 |
+| With no upload, an unreadable image, an unsupported file type, a service error, or no response within 120 seconds, the form renders with its existing values (the round's current score if editing, else 72/36/0), the admin is told auto-fill was unavailable, and no error surfaces to players or other pages. | 2, 12, 13, 14, 15, 16, 18 | 2, 3, 4 |
+| The existing tests still pass. | 19 | 1, 2, 3, 4 |
 
-## Phase 1: Core scorecard extraction and normalisation
+## Phase 1: Field filtering and normalisation module
 <!-- phase: 1 -->
-<!-- targets: scorecard_extraction.py, tests/test_scorecard_extraction.py -->
-<!-- frozen: tests/test_league_deep_dive_wiring.py, tests/test_league_follow_up_wiring.py -->
+<!-- targets: league_scorecard.py, tests/test_league_scorecard_fields.py -->
+<!-- frozen: pages/3_🏆_League.py, pages/4_🥊_Cup.py, pages/5_⛳_Outing.py, streamlit_app.py, data.py, ai_summary.py, requirements.txt, pyproject.toml, uv.lock, test_streamlit_app.py, tests/test_league_deep_dive_wiring.py, tests/test_league_follow_up_wiring.py, features/** -->
 
-**Goal:** A reviewer can prove that JPG/PNG validation, partial extraction, date normalisation, venue matching and every failure path are implemented without network access or page code.
-
-**Changes:**
-- `scorecard_extraction.py` (new): standard-library module using `dataclasses.dataclass`, `collections.abc.Callable, Mapping, Sequence`, `typing.TypeAlias`, `datetime`, `base64`, `json`, `re`, `urllib.request`, and guarded `streamlit` secret reads.
-- Define exactly:
-  - `VisionExtractor: TypeAlias = Callable[[bytes, str], Mapping[str, object]]`
-  - `@dataclass(frozen=True) class ScorecardDraft` with fields and defaults exactly matching the spec: `date: str | None = None`, `venue: str | None = None`, `net: int | None = None`, `gross: int | None = None`, `stableford: int | None = None`, `eagle_count: int | None = None`, `birdie_count: int | None = None`, `par_count: int | None = None`, `bogey_count: int | None = None`, `double_bogey_or_worse_count: int | None = None`.
-  - `extract_scorecard_fields(image_bytes: bytes | None, mime_type: str | None, *, vision_extractor: VisionExtractor | None = None) -> ScorecardDraft | None`
-  - `normalise_scorecard_date(raw_date: str | None) -> str | None`
-  - `match_scorecard_venue(raw_venue: str | None, known_venues: Sequence[str]) -> str | None`
-  - Internal `class ScorecardExtractionError(Exception)`.
-- Constants: `OLLAMA_CHAT_URL = "https://ollama.com/api/chat"`, `OLLAMA_API_KEY_SECRET = "OLLAMA_API_KEY"`, `SCORECARD_VISION_MODEL = "glm-5.3-flash:cloud"`, `REQUEST_TIMEOUT_SECONDS = 30`, `SUPPORTED_MIME_TYPES = {"image/jpeg", "image/jpg", "image/png"}`, `SCORECARD_PROMPT` asking for one JSON object with keys `date`, `venue`, `net`, `gross`, `stableford`, `eagle_count`, `birdie_count`, `par_count`, `bogey_count`, `double_bogey_or_worse_count`, using `null` for uncertain fields.
-- `normalise_scorecard_date`: strip; accept `YYYY-MM-DD`, `YYYY/MM/DD`, `YYYY.MM.DD`, `YYYY年MM月DD日`, and `YYYYMMDD`; validate with `datetime(year, month, day).date().isoformat()`; return `None` on blank, non-string, invalid month/day, or unparseable input; never raise.
-- `match_scorecard_venue`: return `None` for blank/None; strip raw text; compare `casefold()` against each `known.strip().casefold()`; return the exact known spelling on match, otherwise the stripped raw text; never raise.
-- `_is_supported_mime(mime_type)`: lower/strip and accept only `image/jpeg`, `image/jpg`, `image/png`.
-- `_has_valid_image_signature(image_bytes, mime_type)`: JPEG must start with `b"\xff\xd8\xff"`; PNG must start with `b"\x89PNG\r\n\x1a\n"`; return `False` otherwise.
-- `_coerce_int(value)`: `None`/blank/unparseable -> `None`; reject `bool`; `int` -> itself; integral `float` -> `int`; string -> `int(str.strip())`; never raise.
-- `_coerce_text(value)`: `None` -> `None`; otherwise stripped `str(value)` or `None` when empty.
-- `_draft_from_mapping(raw: Mapping[str, object]) -> ScorecardDraft`: read only the ten supported keys; ignore unknown keys; missing or invalid per-field values become `None`.
-- `_default_vision_extractor(image_bytes: bytes, mime_type: str) -> Mapping[str, object]`: read `st.secrets.get("OLLAMA_API_KEY", "")` inside `try/except Exception`; missing key raises `ScorecardExtractionError`; base64-encode image; POST JSON to `OLLAMA_CHAT_URL` with headers `Content-Type: application/json` and `Authorization: Bearer <key>`, payload `{"model": SCORECARD_VISION_MODEL, "stream": False, "messages": [{"role": "system", "content": "You extract golf scorecard fields. Return only a JSON object."}, {"role": "user", "content": SCORECARD_PROMPT, "images": [<base64>]}]}`, timeout `30`; require HTTP 200/201; read `body["message"]["content"]`; strip Markdown fences and take the first `{` to last `}` before `json.loads`; return the parsed `dict`. Any HTTP, timeout, JSON, shape or empty-content exception raises `ScorecardExtractionError` from the original exception.
-- `extract_scorecard_fields`: return `None` when `image_bytes` is falsy, MIME is unsupported/None, or the bytes do not match the MIME signature. Choose `vision_extractor or _default_vision_extractor`; call inside `try/except Exception` and return `None` on any exception. Return `None` when the result is not a `Mapping`. Build the draft with `_draft_from_mapping`; return `None` when every draft field is `None`; otherwise return the draft. No exception escapes.
-- `tests/test_scorecard_extraction.py` (new): pytest tests only, no network, no Streamlit app execution, no teardown fixtures needed.
-
-**Definition of done:**
-- [ ] `tests/test_scorecard_extraction.py`, test `test_draft_defaults_are_all_none`: `ScorecardDraft()` has all ten fields `None`.
-- [ ] `tests/test_scorecard_extraction.py`, test `test_normalise_scorecard_date_accepts_common_formats_and_rejects_invalid`: assert `"2026-06-23"`, `"2026/6/23"`, `"2026.06.23"`, `"2026年6月23日"`, `" 2026-6-3 "` all become `"2026-06-23"`/`"2026-06-03"` as appropriate; assert `None` for `None`, `""`, `"not a date"`, `"2026-02-31"`.
-- [ ] `tests/test_scorecard_extraction.py`, test `test_match_scorecard_venue_is_case_and_whitespace_insensitive`: with `["Pine Valley", "Augusta National"]`, `" pine valley "` returns `"Pine Valley"`, `"Unknown Course"` returns `"Unknown Course"`, `None` returns `None`.
-- [ ] `tests/test_scorecard_extraction.py`, test `test_extract_returns_none_for_no_upload_unsupported_mime_or_bad_signature`: assert `None` for `(None, "image/png")`, `(b"", "image/png")`, `(b"abc", "image/gif")`, `(b"abc", None)`, and `(b"not a png", "image/png")`; assert the fake extractor is never called in those cases.
-- [ ] `tests/test_scorecard_extraction.py`, test `test_extract_returns_partial_draft_for_supported_png`: use valid PNG magic bytes plus arbitrary trailing bytes; fake extractor returns `{"date": "2026/6/23", "venue": " Pine Valley ", "net": "-2", "gross": 75, "stableford": None, "eagle_count": 1, "birdie_count": "2", "par_count": 10, "bogey_count": 4, "double_bogey_or_worse_count": 1, "ignored": "x"}`; assert `draft.net == -2`, `draft.stableford is None`, `draft.birdie_count == 2`, and no `ignored` attribute.
-- [ ] `tests/test_scorecard_extraction.py`, test `test_extract_returns_none_when_extractor_raises_times_out_or_is_malformed`: fake extractor raises `RuntimeError`, raises `TimeoutError`, returns `None`, returns `[]`, returns `{}`, and returns `{"date": None, "gross": "abc"}`; each call returns `None` and does not raise.
-- [ ] `tests/test_scorecard_extraction.py`, test `test_extract_returns_none_when_mime_or_bytes_missing`: assert `extract_scorecard_fields(b"\x89PNG\r\n\x1a\n", None, vision_extractor=pytest.fail) is None`.
-- [ ] No `requirements.txt`, `pyproject.toml`, `uv.lock`, `data.py`, `ai_summary.py`, or existing test file is changed.
-
-**Verify:**
-```bash
-python -m pytest tests/test_scorecard_extraction.py -v
-```
-
-**Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
-
-## Phase 2: League upload control and editable prefill
-<!-- phase: 2 -->
-<!-- targets: pages/3_🏆_League.py, tests/test_league_scorecard_upload_wiring.py -->
-<!-- frozen: scorecard_extraction.py, data.py, ai_summary.py, tests/test_league_deep_dive_wiring.py, tests/test_league_follow_up_wiring.py -->
-
-**Goal:** A reviewer can prove the League page renders the uploader above the score form, feeds successful extraction into editable widget defaults, and still saves the widget values the admin sees.
+**Goal:** `scorecard_field_updates` returns exactly the parseable, found target fields, normalised to ISO dates / ints / closest known venue, and drops everything else.
 
 **Changes:**
-- `pages/3_🏆_League.py`: add imports `hashlib`, `os`, `from collections.abc import Sequence`, `from dataclasses import replace`, and `from scorecard_extraction import ScorecardDraft, VisionExtractor, extract_scorecard_fields, match_scorecard_venue, normalise_scorecard_date`.
-- Add page constants:
-  - `SCORECARD_UPLOAD_LABEL = "记分卡图片 / Scorecard image (JPG/PNG)"`
-  - `SCORECARD_UPLOAD_KEY = "league_scorecard_upload"`
-  - `SCORECARD_UPLOAD_REVISION_KEY = "_league_scorecard_upload_revision"`
-  - `SCORECARD_UPLOAD_NOTICE = "自动填充不可用：请上传 JPG/PNG 记分卡图片，或手动填写。"`
-  - `SCORECARD_UPLOAD_FAILED_NOTICE = "自动填充不可用：无法读取该记分卡，请手动填写。"`
-  - `SCORECARD_UPLOAD_SUCCESS_NOTICE = "已识别记分卡，请核对并修改下方数值。"`
-- Add exactly:
+- `league_scorecard.py` (new file, standard library only — do **not** touch `requirements.txt`, `pyproject.toml` or `uv.lock`). Module docstring `"""Scorecard auto-fill helpers for the League admin score form."""`, then `from __future__ import annotations` and these imports: `import math`, `import re`, `from collections.abc import Mapping as AbcMapping`, `from dataclasses import dataclass`, `from datetime import date, datetime`, `from difflib import get_close_matches`, `from typing import Any, Iterable, Mapping, Sequence`.
+- `league_scorecard.py` constants (exact values):
+  - `ScorecardFieldValue = str | int`
+  - `LEAGUE_SCORECARD_FIELD_KEYS: tuple[str, ...] = ("date", "venue", "net", "gross", "stableford", "eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse")`
+  - `DATE_FIELD_KEY = "date"`, `VENUE_FIELD_KEY = "venue"`
+  - `COUNT_FIELD_KEYS: tuple[str, ...] = ("eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse")`
+  - `NUMERIC_FIELD_KEYS: tuple[str, ...] = ("net", "gross", "stableford", "eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse")`
+  - `ISO_DATE_FORMAT = "%Y-%m-%d"`
+  - `DATE_INPUT_FORMATS: tuple[str, ...] = ("%Y-%m-%d", "%Y/%m/%d", "%Y.%m.%d", "%Y%m%d", "%Y年%m月%d日", "%m/%d/%Y", "%d/%m/%Y", "%d.%m.%Y", "%b %d, %Y", "%B %d, %Y", "%d %b %Y", "%d %B %Y")`
+  - `SCORE_MIN, SCORE_MAX = -200, 200`; `COUNT_MIN, COUNT_MAX = 0, 40`; `VENUE_MATCH_CUTOFF = 0.8`
+  - `SCORECARD_FIELD_ALIASES: dict[str, str]` mapping normalised names to canonical keys: `"date"/"round_date"/"played_on"/"日期" → "date"`; `"venue"/"course"/"location"/"场地"/"球场" → "venue"`; `"net"/"net_score"/"net_score_to_par"/"净杆" → "net"`; `"gross"/"gross_score"/"total"/"total_score"/"总杆"/"总成绩" → "gross"`; `"stableford"/"stableford_points"/"points"/"稳定分"/"史特伯福特分" → "stableford"`; `"eagle"/"eagles"/"eagles_or_better"/"老鹰" → "eagles"`; `"birdie"/"birdies"/"小鸟" → "birdies"`; `"par"/"pars"/"标准杆" → "pars"`; `"bogey"/"bogeys"/"柏忌" → "bogeys"`; `"double_bogey_or_worse"/"double_bogeys_or_worse"/"double_bogeys"/"double_bogey"/"worse"/"双柏忌"/"双柏忌以上" → "double_bogeys_or_worse"`.
+- `league_scorecard.py`, frozen dataclass exactly as the spec's interface:
   ```python
-  def render_league_scorecard_upload(
-      known_venues: Sequence[str],
-      *,
-      key: str = "league_scorecard_upload",
-      vision_extractor: VisionExtractor | None = None,
-  ) -> ScorecardDraft | None:
+  @dataclass(frozen=True)
+  class ScorecardReadResult:
+      found_fields: dict[str, ScorecardFieldValue]
+      unavailable_reason: str | None = None
   ```
-  Behaviour: call `st.file_uploader(SCORECARD_UPLOAD_LABEL, type=["jpg", "jpeg", "png"], key=key)`; if no upload, `st.info(SCORECARD_UPLOAD_NOTICE)`, set `st.session_state[SCORECARD_UPLOAD_REVISION_KEY] = "manual"`, return `None`. If upload exists, read `file_name = str(getattr(uploaded_file, "name", "") or "")`, `extension = os.path.splitext(file_name)[1].lower()`, `mime_type = getattr(uploaded_file, "type", None)`, `image_bytes = uploaded_file.getvalue()`; if extension not in `{".jpg", ".jpeg", ".png"}` or MIME not in `{"image/jpeg", "image/jpg", "image/png"}` or `image_bytes` is falsy, `st.info(SCORECARD_UPLOAD_FAILED_NOTICE)`, set revision `"manual"`, return `None`. Call `extract_scorecard_fields(image_bytes, mime_type, vision_extractor=vision_extractor)`; if `None`, same failed notice/revision/return. On success, `draft = replace(draft, date=normalise_scorecard_date(draft.date), venue=match_scorecard_venue(draft.venue, known_venues))`, call `st.caption(SCORECARD_UPLOAD_SUCCESS_NOTICE)`, set `st.session_state[SCORECARD_UPLOAD_REVISION_KEY] = hashlib.sha256(image_bytes).hexdigest()[:12]`, return `draft`.
-- Add page-local `def _league_known_venues() -> list[str]:` using `from data import load_scores`; return `sorted({str(v).strip() for v in scores["Venue"].dropna() if str(v).strip()})` when `scores` has a `Venue` column, otherwise `[]`; wrap the import/load in `try/except Exception` and return `[]` on failure.
-- Add page-local `def _draft_date(value: str | None) -> date | None:` returning `datetime.strptime(value, "%Y-%m-%d").date()` when `value` is truthy and matches, otherwise `None`.
-- Give the existing League score-entry form the stable form key `"league_score_entry"`; keep its label and submit button unchanged.
-- Immediately before `with st.form("league_score_entry", ...):`, insert `scorecard_draft = render_league_scorecard_upload(_league_known_venues())`.
-- In the form widgets, use the draft only as initial/editable values and keep editing enabled:
-  - date input key `league_score_date`, value `_draft_date(scorecard_draft.date) if scorecard_draft else None`;
-  - venue text input key `league_score_venue`, value `scorecard_draft.venue if scorecard_draft and scorecard_draft.venue is not None else ""`;
-  - net/gross/stableford number inputs keys `league_score_net`, `league_score_gross`, `league_score_stableford`, value `scorecard_draft.<field> if scorecard_draft and scorecard_draft.<field> is not None else None`;
-  - count number inputs keys `league_score_eagle`, `league_score_birdie`, `league_score_par`, `league_score_bogey`, `league_score_double_bogey_or_worse`, value from the matching `ScorecardDraft` field or `None`.
-- In the existing submit block, keep using the local widget variables returned by the widgets, never `scorecard_draft`. For the five count widgets, convert `None` to `0` before building the saved row to preserve the existing default-zero count behaviour; for date/venue/net/gross/stableford, keep the existing validation/error path and do not save when a required value is blank.
-- `tests/test_league_scorecard_upload_wiring.py` (new): use `pathlib.Path`, `ast`, `dataclasses.replace`, `hashlib`, `os`, `re`, and pytest. It must not run Streamlit, start servers, or touch the network.
+- `league_scorecard.py` function `normalize_field_name(name: object) -> str | None`: `text = str(name).strip().casefold().replace("-", "_").replace(" ", "_").replace("／", "_")`; return `SCORECARD_FIELD_ALIASES.get(text)`.
+- `league_scorecard.py` function `parse_date_value(value: object, *, date_format: str = ISO_DATE_FORMAT) -> str | None`: `datetime` → its `.date()`; `date` → itself; `str` → `strip()`, empty returns `None`, then try each of `DATE_INPUT_FORMATS` with `datetime.strptime(text, fmt)`, first success wins; anything else `None`; successful value returned as `parsed.strftime(date_format)`.
+- `league_scorecard.py` function `coerce_int_value(value: object, *, minimum: int = SCORE_MIN, maximum: int = SCORE_MAX) -> int | None`: return `None` for `bool`; `int` kept as-is; `float` kept only when `math.isfinite(value) and value.is_integer()`; `str` stripped must match `re.fullmatch(r"[+-]?\d{1,3}", text)`; then return the int only when `minimum <= number <= maximum`, else `None`; every other type returns `None`.
+- `league_scorecard.py` function `match_venue_name(raw_venue: str, known_venues: Sequence[str], *, cutoff: float = VENUE_MATCH_CUTOFF) -> str`: `cleaned = " ".join(str(raw_venue).split())`; return `""` if empty; build `options = [v for v in known_venues if str(v).strip()]`; return `cleaned` if `options` is empty; if any option casefolds equal to `cleaned.casefold()` return that option verbatim; else `matches = get_close_matches(cleaned.casefold(), [v.casefold() for v in options], n=1, cutoff=cutoff)` and return the first original option whose casefold equals `matches[0]`, otherwise `cleaned`.
+- `league_scorecard.py` function `venue_names_from_records(records: Iterable[Mapping[str, object]]) -> list[str]`: for each record read `record.get("venue") or record.get("Venue") or record.get("场地") or record.get("球场")`, `str(...).strip()`, skip empties, de-duplicate preserving first-seen order, return the list.
+- `league_scorecard.py` function `scorecard_field_updates(extracted_fields: Mapping[str, object], *, known_venues: Sequence[str] = ()) -> dict[str, ScorecardFieldValue]` (the spec signature plus a defaulted keyword-only `known_venues`): for each `(raw_key, raw_value)` — resolve `field = normalize_field_name(raw_key)`, skip when `None`; if `raw_value` is an `AbcMapping`, skip when `raw_value.get("found", raw_value.get("confident", True))` is `False`, `None`, or a string in `{"", "false", "no", "0"}` (casefolded/stripped), then take `raw_value.get("value")`; skip `None`, and skip `list`/`tuple`/`set`/`dict` values; convert with `parse_date_value` for `date`, `match_venue_name(str(value), known_venues)` (skip if the result is empty) for `venue`, else `coerce_int_value(value, minimum=COUNT_MIN, maximum=COUNT_MAX)` for `COUNT_FIELD_KEYS` and `coerce_int_value(value)` otherwise; skip `None`; keep the first value seen per field. Return `{k: found[k] for k in LEAGUE_SCORECARD_FIELD_KEYS if k in found}` (fixed order, only target keys).
+- `tests/test_league_scorecard_fields.py` (new file): `from league_scorecard import (...)` at module top so the repo root is on `sys.path` via pytest's rootdir; no fixtures needed beyond `pytest.mark.parametrize`; no teardown required (pure functions, no files or threads).
 
 **Definition of done:**
-- [ ] `tests/test_league_scorecard_upload_wiring.py`, test `test_league_score_form_renders_upload_above_form`: read `pages/3_🏆_League.py` as UTF-8 text; assert `"def render_league_scorecard_upload("` exists, `st.file_uploader` is called with `type=["jpg", "jpeg", "png"]`, and `source.index("scorecard_draft = render_league_scorecard_upload(") < source.index('with st.form("league_score_entry"')`. This proves spec 1.
-- [ ] `tests/test_league_scorecard_upload_wiring.py`, test `test_league_score_form_uses_draft_as_editable_defaults`: read the page source and assert it contains `scorecard_draft.date`, `.venue`, `.net`, `.gross`, `.stableford`, `.eagle_count`, `.birdie_count`, `.par_count`, `.bogey_count`, `.double_bogey_or_worse_count`, plus keys `league_score_date`, `league_score_venue`, `league_score_net`, `league_score_gross`, `league_score_stableford`, `league_score_eagle`, `league_score_birdie`, `league_score_par`, `league_score_bogey`, `league_score_double_bogey_or_worse`. This proves specs 2, 4 and 5.
-- [ ] `tests/test_league_scorecard_upload_wiring.py`, test `test_league_score_form_submit_does_not_read_stale_draft`: isolate the source from `source.index("if submitted:")` onward and assert `"scorecard_draft" not in submit_source`; assert the submit source contains the five count widget variable conversions to zero and no assignment from `scorecard_draft`. This proves specs 6 and 7.
-- [ ] `tests/test_league_scorecard_upload_wiring.py`, test helper loader `_load_page_helper()`: parse the page source with `ast.parse`, find the `FunctionDef` named `render_league_scorecard_upload`, compile it as a module containing only that function, and exec it with globals for `st`, `extract_scorecard_fields`, `normalise_scorecard_date` (real), `match_scorecard_venue` (real), `replace` (real), `hashlib`, `os`, `ScorecardDraft`, `VisionExtractor`, and the six page notice/key constants. The fake `st` object records `.info()`, `.caption()`, `.file_uploader()`, and uses a plain dict for `.session_state`.
-- [ ] `tests/test_league_scorecard_upload_wiring.py`, test `test_upload_helper_returns_none_without_upload`: fake `file_uploader` returns `None`; assert helper returns `None`, `fake_st.info` received `SCORECARD_UPLOAD_NOTICE`, and `session_state[SCORECARD_UPLOAD_REVISION_KEY] == "manual"`. This proves spec 8.
-- [ ] `tests/test_league_scorecard_upload_wiring.py`, test `test_upload_helper_rejects_unsupported_extension_or_mime`: fake upload has `name="card.gif"`, `type="image/gif"`, `getvalue()` returns `b"abc"`; assert helper returns `None`, `st.info` received `SCORECARD_UPLOAD_FAILED_NOTICE`, and `extract_scorecard_fields` was not called. This proves spec 9.
-- [ ] `tests/test_league_scorecard_upload_wiring.py`, test `test_upload_helper_returns_none_when_extraction_fails`: fake upload has valid `.png` name, `type="image/png"`, and valid PNG magic bytes; injected extractor returns `None`; assert helper returns `None` and `st.info` received `SCORECARD_UPLOAD_FAILED_NOTICE`. This proves specs 10 and 11 at the page seam.
-- [ ] `tests/test_league_scorecard_upload_wiring.py`, test `test_upload_helper_normalises_successful_draft`: fake upload has valid `.png` name/type/bytes; injected extractor returns `ScorecardDraft(date="2026/6/23", venue=" pine valley ", net=2, gross=80, stableford=30, eagle_count=None, birdie_count=1, par_count=8, bogey_count=5, double_bogey_or_worse_count=2)`; call helper with `known_venues=["Pine Valley"]`; assert returned `date == "2026-06-23"`, `venue == "Pine Valley"`, `net == 2`, `eagle_count is None`, `st.caption` received `SCORECARD_UPLOAD_SUCCESS_NOTICE`, and `session_state[SCORECARD_UPLOAD_REVISION_KEY] == hashlib.sha256(valid_png_bytes).hexdigest()[:12]`. This proves specs 2, 13 and 14.
-- [ ] No change to `scorecard_extraction.py`, `data.py`, `ai_summary.py`, or any existing test file; no background threads, servers, `st.rerun`, or network access in tests.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_league_scorecard_field_keys_and_result_contract`: asserts `LEAGUE_SCORECARD_FIELD_KEYS == ("date", "venue", "net", "gross", "stableford", "eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse")`, `ScorecardReadResult({}).unavailable_reason is None`, and `pytest.raises(dataclasses.FrozenInstanceError)` around `result.found_fields = {}`.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_scorecard_field_updates_keeps_only_found_target_fields`: input `{"date": "2026/06/23", "venue": "Pine Valley", "net": 5, "gross": 77, "stableford": 36, "eagles": 1, "birdies": 2, "pars": 3, "bogeys": 4, "double_bogeys_or_worse": 5}` returns all ten keys in `LEAGUE_SCORECARD_FIELD_KEYS` order, `result["date"] == "2026-06-23"`, and every non-date value is an `int`.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_scorecard_field_updates_drops_missing_empty_and_unparseable`: `{"net": None, "gross": "", "stableford": "n/a", "date": "unknown", "venue": "   ", "birdies": []}` returns `{}`.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_scorecard_field_updates_drops_not_found_markers`: `{"net": {"value": 5, "found": False}, "gross": {"value": 77, "found": True}, "stableford": {"value": 36, "found": "no"}}` returns `{"gross": 77}`.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_scorecard_field_updates_parses_numeric_forms`: `"+5"`, `" 12 "`, `7.0` become ints; `7.5`, `True`, `"five"`, `object()` are dropped; `{"eagles": -1}` and `{"gross": 250}` dropped; `{"net": -12}` kept.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_scorecard_field_updates_normalises_dates` (`pytest.mark.parametrize` over `("2026-06-23", "2026/06/23", "2026.06.23", "2026年6月23日", "20260623", date(2026, 6, 23), datetime(2026, 6, 23, 18, 0))`): every case yields `{"date": "2026-06-23"}`.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_match_venue_name_prefers_known_venue`: case-insensitive exact match returns the known option's own casing; `match_venue_name("Pine Valey Golf Club", ["Pine Valley Golf Club", "Augusta National"])` returns `"Pine Valley Golf Club"`; `match_venue_name("Somewhere Else", ["Augusta National"])` returns `"Somewhere Else"`; `match_venue_name("  Pine   Valley ", [])` returns `"Pine Valley"`.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_venue_names_from_records`: `[{"venue": "A"}, {"venue": " A "}, {"Venue": "B"}, {"venue": ""}, {}]` returns `["A", "B"]`.
+- [ ] `tests/test_league_scorecard_fields.py`, test `test_scorecard_field_updates_aliases_and_unknown_keys`: `{"Total": "77", "net_score": "5", "Double Bogey or Worse": "6", "player": "Neo"}` returns keys `("gross", "net", "double_bogeys_or_worse")` in `LEAGUE_SCORECARD_FIELD_KEYS` order with int values.
 
 **Verify:**
 ```bash
-python -m pytest tests/test_league_scorecard_upload_wiring.py -v
+python -m pytest tests/test_league_scorecard_fields.py -v
 ```
 
 **Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
 
-## Phase 3: Cross-page fallback isolation and regression guard
-<!-- phase: 3 -->
-<!-- targets: tests/test_scorecard_scope_isolation.py -->
-<!-- frozen: pages/3_🏆_League.py, pages/4_🥊_Cup.py, pages/5_⛳_Outing.py, streamlit_app.py, scorecard_extraction.py -->
+## Phase 2: One Ollama Cloud scorecard read with a 120 s cap
+<!-- phase: 2 -->
+<!-- targets: league_scorecard.py, tests/test_league_scorecard_read.py -->
+<!-- frozen: pages/3_🏆_League.py, pages/4_🥊_Cup.py, pages/5_⛳_Outing.py, streamlit_app.py, data.py, ai_summary.py, requirements.txt, pyproject.toml, uv.lock, test_streamlit_app.py, tests/test_league_scorecard_fields.py, tests/test_league_deep_dive_wiring.py, features/** -->
 
-**Goal:** A reviewer can prove the auto-fill notice and extraction code are confined to the League page and cannot appear on player-facing or other tournament pages.
+**Goal:** `read_league_scorecard` makes at most one POST to `https://ollama.com/api/generate`, converts every failure mode into an `unavailable_reason`, and never raises.
 
 **Changes:**
-- `tests/test_scorecard_scope_isolation.py` (new): pytest source-level regression test using `pathlib.Path` only.
-- Test `test_other_pages_do_not_reference_scorecard_autofill`: for each of `pages/4_🥊_Cup.py`, `pages/5_⛳_Outing.py`, and `streamlit_app.py`, read UTF-8 text and assert none of these strings occur: `"scorecard_extraction"`, `"render_league_scorecard_upload"`, `"league_scorecard_upload"`, `"自动填充不可用"`, `"SCORECARD_UPLOAD_FAILED_NOTICE"`.
-- Test `test_league_page_owns_the_scorecard_upload_control`: read `pages/3_🏆_League.py` and assert it contains `"def render_league_scorecard_upload("`, `"st.file_uploader("`, and `"SCORECARD_UPLOAD_FAILED_NOTICE"`.
-- No production file is modified in this phase.
+- `league_scorecard.py`: extend the import block with `import base64`, `import json`, `import os`, `import socket`, `import urllib.error`, `import urllib.request`.
+- `league_scorecard.py` constants: `OLLAMA_GENERATE_URL = "https://ollama.com/api/generate"`, `DEFAULT_SCORECARD_MODEL = "glm-5.3-flash:cloud"`, `DEFAULT_TIMEOUT_SECONDS = 120.0`, `SUPPORTED_IMAGE_MIME_TYPES: tuple[str, ...] = ("image/jpeg", "image/png", "image/webp", "image/gif")`, `MIME_ALIASES: dict[str, str] = {"image/jpg": "image/jpeg", "image/pjpeg": "image/jpeg"}`, `MODEL_ENV_NAMES: tuple[str, ...] = ("OLLAMA_SCORECARD_MODEL", "OLLAMA_MODEL")`, `API_KEY_ENV_NAMES: tuple[str, ...] = ("OLLAMA_API_KEY", "OLLAMA_KEY")`.
+- `league_scorecard.py` exception `class ScorecardRequestError(RuntimeError): """Transport-level failure of the scorecard generate request."""`.
+- `league_scorecard.py` constant `SCORECARD_PROMPT: str` holding exactly:
+  ```
+  You read one photographed golf scorecard for a single player. The card may be printed or handwritten, in Chinese, English, or both.
+  Return a single JSON object and nothing else.
+  Allowed keys: "date", "venue", "net", "gross", "stableford", "eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse".
+  Rules:
+  - "date": the round date as an ISO string "YYYY-MM-DD".
+  - "venue": the venue/course name exactly as printed on the card.
+  - "net", "gross", "stableford": integers.
+  - "eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse": non-negative integer counts for this one player only.
+  - Use null for any value you cannot read with confidence. Never guess and never invent a value.
+  - Do not add extra keys.
+  ```
+- `league_scorecard.py` function `sniff_image_mime(image_bytes: bytes) -> str | None`: JPEG when `data.startswith(b"\xff\xd8\xff")`; PNG when `data.startswith(b"\x89PNG\r\n\x1a\n")`; WebP when `data[:4] == b"RIFF" and data[8:12] == b"WEBP"`; GIF when `data[:6] in (b"GIF87a", b"GIF89a")`; else `None` (guard `bytes(image_bytes or b"")`).
+- `league_scorecard.py` function `normalize_mime_type(mime_type: str | None, image_bytes: bytes) -> str | None`: `candidate = (mime_type or "").split(";")[0].strip().lower()`, mapped through `MIME_ALIASES`; return it when in `SUPPORTED_IMAGE_MIME_TYPES`, else `sniff_image_mime(image_bytes)`.
+- `league_scorecard.py` function `build_scorecard_payload(image_bytes: bytes, *, model: str) -> dict[str, Any]` returning exactly `{"model": model, "prompt": SCORECARD_PROMPT, "images": [base64.b64encode(image_bytes).decode("ascii")], "stream": False, "format": "json", "options": {"temperature": 0, "num_predict": 512}}`.
+- `league_scorecard.py` function `_scorecard_model() -> str`: first non-empty `os.environ` value among `MODEL_ENV_NAMES`; then, inside `try: import streamlit as st … except Exception: pass`, the first non-empty `st.secrets[name]` among the same names (`str(...).strip()`); else `DEFAULT_SCORECARD_MODEL`.
+- `league_scorecard.py` function `_ollama_api_key() -> str | None`: same resolution order using `API_KEY_ENV_NAMES`, returning `None` when nothing is configured.
+- `league_scorecard.py` function `_post_ollama_generate(payload: dict[str, Any], timeout_seconds: float) -> str`: build `headers = {"Content-Type": "application/json", "Accept": "application/json"}`, add `"Authorization": f"Bearer {api_key}"` when `_ollama_api_key()` is truthy; `urllib.request.Request(OLLAMA_GENERATE_URL, data=json.dumps(payload).encode("utf-8"), headers=headers, method="POST")`; `with urllib.request.urlopen(request, timeout=timeout_seconds) as response: return response.read().decode("utf-8", errors="replace")`; map `urllib.error.HTTPError` to `raise ScorecardRequestError(f"http {exc.code}") from exc` and `(urllib.error.URLError, TimeoutError, socket.timeout, OSError)` to `raise ScorecardRequestError("timeout" if isinstance(exc, (TimeoutError, socket.timeout)) else "network error") from exc`. No retry loop anywhere.
+- `league_scorecard.py` function `extract_json_object(text: str) -> dict[str, Any] | None`: return `None` for non-`str`; strip; if it starts with ```` ``` ````, strip backticks, drop a leading `json` (case-insensitive), strip again; take the slice from the first `{` to the last `}` (`None` when absent/reversed); `json.loads` inside `try` catching `(json.JSONDecodeError, TypeError, ValueError)`; return the dict only when it is an `AbcMapping`-compatible `dict`.
+- `league_scorecard.py` function `parse_ollama_response(body: str) -> dict[str, Any] | None`: `json.loads(body)` in the same `try`/`except`; `None` when the result is not a dict; when `outer.get("response")` is a `str` return `extract_json_object(inner)`; when it is an `AbcMapping` return `dict(inner)`; when `"error" in outer` return `None`; otherwise return `outer`.
+- `league_scorecard.py` function `read_league_scorecard(image_bytes: bytes, mime_type: str | None, *, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS) -> ScorecardReadResult`: empty data → `ScorecardReadResult({}, "empty image")`; `normalize_mime_type(...) is None` → `ScorecardReadResult({}, "unsupported file type")`; then inside `try` build the payload and call `_post_ollama_generate(payload, timeout_seconds)` (positional second argument), catching `ScorecardRequestError` → `ScorecardReadResult({}, str(exc) or "service error")` and bare `Exception` → `ScorecardReadResult({}, "service error")`; unparseable body → `ScorecardReadResult({}, "unparseable response")`; `found = scorecard_field_updates(parsed)` (no `known_venues` here — the page applies the venue list afterwards) with `except Exception` → `"unparseable response"`; empty `found` → `ScorecardReadResult({}, "no readable fields")`; else `ScorecardReadResult(found)`.
+- `tests/test_league_scorecard_read.py` (new file): `import json`, `from unittest.mock import Mock`, `import pytest`, `import league_scorecard as ls`. No real network: every test that reaches HTTP monkeypatches `ls._post_ollama_generate`; no fixtures need teardown beyond `monkeypatch` (`monkeypatch.delenv("OLLAMA_API_KEY", raising=False)`, `monkeypatch.delenv("OLLAMA_MODEL", raising=False)` where model/key resolution matters); no threads, servers or temp files.
 
 **Definition of done:**
-- [ ] `tests/test_scorecard_scope_isolation.py`, test `test_other_pages_do_not_reference_scorecard_autofill`: Cup, Outing and root app sources contain no scorecard-extraction imports, no League upload key, and no auto-fill-unavailable notice text. This proves spec 12.
-- [ ] `tests/test_scorecard_scope_isolation.py`, test `test_league_page_owns_the_scorecard_upload_control`: the League page contains the upload helper and failure notice. This guards the Phase 2 wiring.
-- [ ] The pipeline’s final `python -m pytest -q && behave --format progress` run collects and passes all pre-existing tests; this phase does not edit any existing test file. This proves spec 15.
-- [ ] No source file other than `tests/test_scorecard_scope_isolation.py` is changed in this phase.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_read_success_returns_found_fields`: `monkeypatch.setattr(ls, "_post_ollama_generate", stub)` where `stub` records calls and returns `json.dumps({"response": "```json\n{\"date\": \"2026-06-23\", \"net\": \"5\", \"gross\": 77, \"player\": \"Neo\"}\n```"})`; asserts one call, `result.unavailable_reason is None`, `result.found_fields == {"date": "2026-06-23", "net": 5, "gross": 77}`.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_request_payload_and_timeout`: stub captures `(payload, timeout_seconds)`; asserts `payload["model"] == "glm-5.3-flash:cloud"` with no env/secrets set, `payload["stream"] is False`, `payload["format"] == "json"`, `payload["images"] == [base64.b64encode(b"\xff\xd8\xff\xe0card").decode("ascii")]`, `payload["prompt"] == ls.SCORECARD_PROMPT`, and `timeout_seconds == 120.0`; a second call with `timeout_seconds=5.0` asserts `timeout_seconds == 5.0`.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_model_env_override`: `monkeypatch.setenv("OLLAMA_SCORECARD_MODEL", "custom:cloud")` → `payload["model"] == "custom:cloud"`.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_endpoint_constant`: `ls.OLLAMA_GENERATE_URL == "https://ollama.com/api/generate"`.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_unsupported_mime_sends_no_request`: stub raises `AssertionError("must not be called")`; `read_league_scorecard(b"%PDF-1.4", "application/pdf")` returns `unavailable_reason == "unsupported file type"` and `found_fields == {}`.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_empty_image_sends_no_request`: `read_league_scorecard(b"", "image/jpeg")` → `unavailable_reason == "empty image"`, stub never called.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_mime_sniffed_from_magic_bytes`: `read_league_scorecard(b"\x89PNG\r\n\x1a\n" + b"x" * 8, None)` reaches the stub exactly once and parses a `{"response": "{\"net\": 3}"}` body to `found_fields == {"net": 3}`.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_http_error_becomes_unavailable`: stub raises `ls.ScorecardRequestError("http 500")` → `unavailable_reason == "http 500"`, `found_fields == {}`, one call only.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_timeout_becomes_unavailable`: stub raises `ls.ScorecardRequestError("timeout")` → `unavailable_reason == "timeout"`, one call only.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_unparseable_and_fieldless_responses`: stub returns `"not json"` → `"unparseable response"`; stub returns `json.dumps({"response": "{}"})` → `"no readable fields"`; stub returns `json.dumps({"error": "boom"})` → not `None` and `found_fields == {}`.
+- [ ] `tests/test_league_scorecard_read.py`, test `test_unexpected_exception_is_swallowed`: stub raises `RuntimeError("kaboom")` → `unavailable_reason == "service error"` (no exception escapes).
 
 **Verify:**
 ```bash
-python -m pytest tests/test_scorecard_scope_isolation.py -v
+python -m pytest tests/test_league_scorecard_read.py -v
+```
+
+**Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
+
+## Phase 3: Session-state application and upload fingerprint
+<!-- phase: 3 -->
+<!-- targets: league_scorecard.py, tests/test_league_scorecard_state.py -->
+<!-- frozen: pages/3_🏆_League.py, streamlit_app.py, data.py, ai_summary.py, requirements.txt, pyproject.toml, uv.lock, test_streamlit_app.py, tests/test_league_scorecard_fields.py, tests/test_league_scorecard_read.py, features/** -->
+
+**Goal:** A found-field update set can be written into an arbitrary mapping of widget keys exactly once, and the same selected image can be recognised so no second read is attempted.
+
+**Changes:**
+- `league_scorecard.py`: extend imports with `import hashlib` and `from collections.abc import MutableMapping as AbcMutableMapping`.
+- `league_scorecard.py` function `apply_scorecard_updates(updates: Mapping[str, ScorecardFieldValue], widget_keys: Mapping[str, str], session_state: MutableMapping[str, Any]) -> list[str]` (annotate the third parameter with the typing `MutableMapping`; do not import Streamlit): iterate `LEAGUE_SCORECARD_FIELD_KEYS` in order; when `field in updates` **and** `field in widget_keys`, assign `session_state[widget_keys[field]] = updates[field]` and append `field` to the returned list; every other key in `updates` (unknown fields, fields without a widget key) is ignored; return the applied fields in `LEAGUE_SCORECARD_FIELD_KEYS` order. Must be idempotent — calling twice with the same arguments yields the same session state and the same returned list.
+- `league_scorecard.py` function `scorecard_upload_fingerprint(file_name: str, payload: bytes) -> str`: `hashlib.sha256(str(file_name).encode("utf-8") + b"\x00" + bytes(payload or b"")).hexdigest()`.
+- `tests/test_league_scorecard_state.py` (new file): `import hashlib`, `import pytest`, `from league_scorecard import LEAGUE_SCORECARD_FIELD_KEYS, apply_scorecard_updates, scorecard_upload_fingerprint`. Session state is a plain `dict` created per test — no Streamlit runtime, no fixtures to tear down.
+
+**Definition of done:**
+- [ ] `tests/test_league_scorecard_state.py`, test `test_apply_writes_only_found_fields_with_widget_keys`: `state = {"league_sc_net": 99, "league_sc_venue": "Old"}`; `widget_keys = {"date": "league_sc_date", "venue": "league_sc_venue", "net": "league_sc_net"}`; calling with `{"venue": "New", "gross": 77}` returns `["venue"]`, sets `state["league_sc_venue"] == "New"`, leaves `state["league_sc_net"] == 99`, and does not create `league_sc_gross`.
+- [ ] `tests/test_league_scorecard_state.py`, test `test_apply_ignores_unknown_fields_and_missing_widget_keys`: updates `{"eagles": 2, "player": "Neo"}` with `widget_keys == {}` returns `[]` and leaves `state == {}`.
+- [ ] `tests/test_league_scorecard_state.py`, test `test_apply_returns_fields_in_key_order_and_is_idempotent`: updates for all ten fields with a matching full `widget_keys` map returns `list(LEAGUE_SCORECARD_FIELD_KEYS)`; a second identical call returns the same list and leaves `state` byte-identical (`state == dict(state_copy)`).
+- [ ] `tests/test_league_scorecard_state.py`, test `test_fingerprint_is_stable_and_payload_sensitive`: same name/payload gives equal 64-char lowercase hex strings matching `hashlib.sha256(b"a.jpg\x00" + b"x").hexdigest()`; changing the payload or the file name changes the value.
+
+**Verify:**
+```bash
+python -m pytest tests/test_league_scorecard_state.py -v
+```
+
+**Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
+
+## Phase 4: Wire the picker, prefill and notice into the League page
+<!-- phase: 4 -->
+<!-- targets: pages/3_🏆_League.py, tests/test_league_scorecard_wiring.py -->
+<!-- frozen: league_scorecard.py, streamlit_app.py, data.py, ai_summary.py, requirements.txt, pyproject.toml, uv.lock, test_streamlit_app.py, tests/test_league_scorecard_fields.py, tests/test_league_scorecard_read.py, tests/test_league_scorecard_state.py, features/** -->
+
+**Goal:** The League score form shows a scorecard picker above its ten target fields, pre-fills only found fields into those widgets' session-state keys with an `st.info` notice on failure, and leaves the fields, defaults and Save path otherwise untouched.
+
+**Changes:**
+- `pages/3_🏆_League.py`: add `import` at the top after the existing imports: `from league_scorecard import (LEAGUE_SCORECARD_FIELD_KEYS, ScorecardReadResult, apply_scorecard_updates, read_league_scorecard, scorecard_field_updates, scorecard_upload_fingerprint, venue_names_from_records)`. Keep every existing import and `st.set_page_config` call as-is.
+- `pages/3_🏆_League.py` module constants near the top (after imports, before the page body):
+  ```python
+  LEAGUE_SCORECARD_WIDGET_KEYS: dict[str, str] = {
+      "date": "league_sc_date",
+      "venue": "league_sc_venue",
+      "net": "league_sc_net",
+      "gross": "league_sc_gross",
+      "stableford": "league_sc_stableford",
+      "eagles": "league_sc_eagles",
+      "birdies": "league_sc_birdies",
+      "pars": "league_sc_pars",
+      "bogeys": "league_sc_bogeys",
+      "double_bogeys_or_worse": "league_sc_double_bogeys_or_worse",
+  }
+  LEAGUE_SCORECARD_UPLOAD_KEY = "league_scorecard_upload"
+  LEAGUE_SCORECARD_LAST_READ_KEY = "league_scorecard_last_read"
+  LEAGUE_SCORECARD_NOTICE_KEY = "league_scorecard_notice"
+  LEAGUE_SCORECARD_PREFILL_KEY = "league_scorecard_prefill"
+  LEAGUE_SCORECARD_SNAPSHOT_KEY = "league_sc_defaults_snapshot"
+  AUTOFILL_UNAVAILABLE_NOTICE = "Auto-fill from the scorecard image was unavailable — please enter the values manually."
+  ```
+  For each of the ten fields, if the existing widget already passes `key=`, use that existing key string in `LEAGUE_SCORECARD_WIDGET_KEYS`; otherwise use the names above.
+- `pages/3_🏆_League.py`: add three module-level helpers before the page body:
+  - `def _scorecard_widget_default(field: str, fallback: Any) -> dict[str, Any]` — returns `{"key": LEAGUE_SCORECARD_WIDGET_KEYS[field]}` when that key is already in `st.session_state`, else `{"key": LEAGUE_SCORECARD_WIDGET_KEYS[field], "value": fallback}` (use `"index": fallback` instead of `"value"` for `st.selectbox`/`st.radio` widgets, passing the existing index expression as `fallback`).
+  - `def _scorecard_known_venues() -> list[str]` — `try: return venue_names_from_records(<the league round records this page has already loaded for the round selector>)` / `except Exception: return []`; pass a list of dicts directly and a pandas DataFrame as `<name>.to_dict("records")`; if no league records are in scope at that point in the script, return `[]` (venue then keeps the text as read).
+  - `def _scorecard_defaults_snapshot(**base: object) -> tuple[str, ...]` — `return tuple(f"{name}={value!r}" for name, value in sorted(base.items()))`.
+- `pages/3_🏆_League.py`: hoist the ten existing default expressions into locals named `_base_date`, `_base_venue`, `_base_net`, `_base_gross`, `_base_stableford`, `_base_eagles`, `_base_birdies`, `_base_pars`, `_base_bogeys`, `_base_double_bogeys_or_worse` — a pure refactor, the values must be identical to today's (`72/36/0` defaults when creating, the selected round's stored values when editing).
+- `pages/3_🏆_League.py`: immediately above the first target widget (that is, above the date/venue/net fields; outside any `st.form` block, so above the `with st.form(...)` line when the score widgets are inside a form), insert in this order:
+  1. `_base_values = {"date": _base_date, "venue": _base_venue, "net": _base_net, "gross": _base_gross, "stableford": _base_stableford, "eagles": _base_eagles, "birdies": _base_birdies, "pars": _base_pars, "bogeys": _base_bogeys, "double_bogeys_or_worse": _base_double_bogeys_or_worse}` then `_snapshot = _scorecard_defaults_snapshot(**_base_values)`; when `st.session_state.get(LEAGUE_SCORECARD_SNAPSHOT_KEY) != _snapshot`, loop `for _key in LEAGUE_SCORECARD_WIDGET_KEYS.values(): st.session_state.pop(_key, None)` and store `st.session_state[LEAGUE_SCORECARD_SNAPSHOT_KEY] = _snapshot` (this only pops keys *before* their widgets are created, so switching the round/player still refreshes the form).
+  2. `uploaded_scorecard = st.file_uploader("Scorecard image / 记分卡图片（自动填写）", type=None, key=LEAGUE_SCORECARD_UPLOAD_KEY)`.
+  3. When `uploaded_scorecard is not None`: `payload = uploaded_scorecard.getvalue()`, `fingerprint = scorecard_upload_fingerprint(uploaded_scorecard.name, payload)`; only when `st.session_state.get(LEAGUE_SCORECARD_LAST_READ_KEY) != fingerprint` do: store the fingerprint, call `result = read_league_scorecard(payload, uploaded_scorecard.type)`, then `updates = scorecard_field_updates(result.found_fields, known_venues=_scorecard_known_venues())`, then either `st.session_state[LEAGUE_SCORECARD_NOTICE_KEY] = AUTOFILL_UNAVAILABLE_NOTICE` and `st.session_state[LEAGUE_SCORECARD_PREFILL_KEY] = {}` when `result.unavailable_reason is not None or not updates`, or `st.session_state.pop(LEAGUE_SCORECARD_NOTICE_KEY, None)` and `st.session_state[LEAGUE_SCORECARD_PREFILL_KEY] = dict(updates)` on success; finish that branch with `st.rerun()` (use `st.experimental_rerun()` only if the pinned Streamlit in `requirements.txt` predates 1.27). Exactly one `read_league_scorecard` call per fingerprint — no retry, cache or queue.
+  4. When `uploaded_scorecard is None`: `st.session_state[LEAGUE_SCORECARD_NOTICE_KEY] = AUTOFILL_UNAVAILABLE_NOTICE`.
+  5. When `st.session_state.get(LEAGUE_SCORECARD_NOTICE_KEY)`: `st.info(st.session_state[LEAGUE_SCORECARD_NOTICE_KEY])` — never `st.error`, never `st.stop`, no traceback.
+  6. `_prefill = st.session_state.pop(LEAGUE_SCORECARD_PREFILL_KEY, {}) or {}` then `for _field, _value in _prefill.items(): if _field in LEAGUE_SCORECARD_WIDGET_KEYS: st.session_state[LEAGUE_SCORECARD_WIDGET_KEYS[_field]] = _value` (applies each prefill exactly once; `apply_scorecard_updates` is exercised by the Phase 3 tests and may be used here instead of the loop, passing `LEAGUE_SCORECARD_WIDGET_KEYS` and `st.session_state`).
+- `pages/3_🏆_League.py`: for each of the ten target widgets, keep the existing label, order, container/column layout, `min_value`/`max_value`/`step`/`help` arguments and add `**_scorecard_widget_default("<field>", _base_<field>)`. Do **not** change widget types, labels, ordering, or the ten defaults; when the date widget is `st.date_input`, convert a pre-filled ISO string with `date.fromisoformat(...)` inside a `try/except ValueError` before writing it into session state, and when the venue/date widget is a `st.selectbox`, drop that update instead of writing a value that is not among its options.
+- `pages/3_🏆_League.py`: do not touch anything below the ten widgets — the Save button, the round mutation code and the existing `github_upload_image(...)` call stay byte-identical.
+- `tests/test_league_scorecard_wiring.py` (new file): `import pathlib`, `import re`, `import pytest`, `from league_scorecard import LEAGUE_SCORECARD_FIELD_KEYS`. Read the page with `LEAGUE_PAGE = pathlib.Path("pages/3_🏆_League.py").read_text(encoding="utf-8")` in a module-level constant (no fixtures, no imports of the page module, no Streamlit runtime, nothing to tear down).
+
+**Definition of done:**
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_picker_is_rendered_with_its_own_key`: asserts `"st.file_uploader("` in the page source, `"LEAGUE_SCORECARD_UPLOAD_KEY"` in it, `'type=None'` in it, and that the `st.file_uploader(` call's character offset is smaller than the offset of `"_base_net"` (the picker renders above the fields).
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_all_ten_widget_keys_are_wired`: for every field in `LEAGUE_SCORECARD_FIELD_KEYS`, asserts `f'"{field}": "league_sc_'` appears in the page (the `LEAGUE_SCORECARD_WIDGET_KEYS` entry) and that `f'_scorecard_widget_default("{field}"'` appears at least once.
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_read_and_filter_helpers_are_used`: asserts `"read_league_scorecard("`, `"scorecard_field_updates("`, `"scorecard_upload_fingerprint("`, `"venue_names_from_records("` and `"st.rerun()"` all appear in the page source.
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_unavailable_notice_is_informational_only`: asserts `"AUTOFILL_UNAVAILABLE_NOTICE"` and `"st.info("` appear, and that neither `"st.error(AUTOFILL_UNAVAILABLE_NOTICE"` nor `"st.stop("` appears anywhere in the page.
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_save_path_still_uploads_exactly_once`: asserts `page_source.count("github_upload_image(") == 1` and that the offset of `"github_upload_image("` is greater than the offset of `"st.file_uploader("` (the upload call remains in the unchanged Save path).
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_no_other_page_leaks_the_notice`: for every `pathlib.Path("pages").glob("*.py")` other than `3_🏆_League.py`, asserts `"AUTOFILL_UNAVAILABLE_NOTICE" not in text` and `"read_league_scorecard" not in text` (spec behaviour 15: nothing from a failed read is visible on other pages).
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_autofill_never_persists_without_save`: asserts `"github_upload_image"` and `"read_league_scorecard"` never appear on the same line (`assert not any("github_upload_image" in line and "read_league_scorecard" in line for line in LEAGUE_PAGE.splitlines())`), proving the extraction result is never saved independently of Save.
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_existing_field_defaults_unchanged`: asserts the literal default expressions still in the source: `"72"` and `"36"` and `"0"` each appear in the hoisted base-value lines (`_base_` substring present in the same line) so the today-defaults are intact.
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_snapshot_reset_guard_present`: asserts `"LEAGUE_SCORECARD_SNAPSHOT_KEY"` and `"st.session_state.pop(_key, None)"` (or the equivalent `st.session_state.pop(LEAGUE_SCORECARD_WIDGET_KEYS[_field], None)`) appear in the page, so a switched round clears stale widget state.
+- [ ] `tests/test_league_scorecard_wiring.py`, test `test_prefill_is_applied_from_session_state`: asserts the substring `"_prefill = st.session_state.pop(LEAGUE_SCORECARD_PREFILL_KEY"` (or `apply_scorecard_updates(updates, LEAGUE_SCORECARD_WIDGET_KEYS, st.session_state)`) appears, so found fields reach `st.session_state` before Save.
+- [ ] Manual reviewer check (not part of Verify): `git diff sdlc/011-league-admin-score-form-a-scorecard/approved -- "pages/3_🏆_League.py"` shows only the import block, the new constants/helpers, the picker/notice/prefill block and `key=`/default plumbing on the ten widgets — no change to labels, ordering, `min_value`/`max_value`/`step`, the Save button, the round mutation code or the `github_upload_image` call.
+
+**Verify:**
+```bash
+python -m pytest tests/test_league_scorecard_wiring.py -v
 ```
 
 **Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
 
 ## Risks
-- Ollama Cloud may not accept the native `messages[].images` payload for `glm-5.3-flash:cloud`; Phase 1 catches every transport/shape failure and returns `None`, and the page test injects a fake extractor, so production failure degrades to manual entry rather than raising.
-- Streamlit widget state can retain old defaults after a new upload; Phase 2 gives every score widget a stable key and records an upload revision hash, and the wiring test checks the helper sets that revision. If the page does not actually rebuild widgets on revision change, Phase 2’s save test plus manual check of a second upload will expose it.
-- `st.number_input(value=None)` availability depends on the installed Streamlit version; Phase 2’s source/wiring tests will show whether the blank-default approach is present, and the final regression run catches import/render failures.
-- `data.load_scores()` or a `Venue` column may not exist; Phase 2’s `_league_known_venues()` fails closed to `[]`, so extracted venue text is kept and the unit-tested matching still works when a list is supplied.
-- The existing save block may require non-`None` numeric values; Phase 2 explicitly converts blank count widgets to `0` and keeps existing required-field validation for date/venue/net/gross/stableford, and the submit-source test prevents saving the stale draft object.
+
+- **Existing widget types/keys are not known when writing this plan.** If the League form uses `st.selectbox` for date or venue, or already assigns different `key=` values, Phase 4's `_scorecard_widget_default` and `LEAGUE_SCORECARD_WIDGET_KEYS` must follow the real widgets; the Phase 4 test `test_all_ten_widget_keys_are_wired` and the manual diff check catch a mismatch.
+- **Writing `st.session_state` after a widget is created raises `StreamlitAPIException`.** All prefill writes and the snapshot `pop` are specified to happen before the ten widgets are instantiated in the same run; the picker block ends in `st.rerun()`, so the write and the widget render never share a run. Any reordering shows up as a runtime exception during the reviewer's manual check.
+- **Session-state keys freezing the form when the admin switches player/round.** Mitigated by the `LEAGUE_SCORECARD_SNAPSHOT_KEY` reset (Phase 4, `test_snapshot_reset_guard_present`); if the base-value expressions are computed from anything other than the selected round, the reset will fire too often and silently blank the auto-fill — Phase 4's manual check covers it.
+- **Venue matching has no data source in `read_league_scorecard`.** The page supplies `known_venues` via `_scorecard_known_venues()`; if it returns `[]`, venues stay as read (the documented fallback) and behaviour 6's "closest existing venue" silently degrades. Phase 3's `test_match_venue_name_prefers_known_venue` proves the matcher itself; the wiring test only proves the call exists.
+- **Model/secret names.** `_scorecard_model()` prefers `OLLAMA_SCORECARD_MODEL`/`OLLAMA_MODEL` env/secrets and falls back to `glm-5.3-flash:cloud`; if the app already stores the model under a different secrets key, the request is still well-formed but may target the default model. Phase 2's `test_request_payload_and_timeout` and `test_model_env_override` pin the behaviour.
+- **Network flakiness or accidental real calls in tests.** Every Phase 2 test monkeypatches `_post_ollama_generate`; a missing monkeypatch makes `test_unsupported_mime_sends_no_request` fail fast rather than hang.
+- **`st.rerun()` availability.** Streamlit 1.27+ provides it; Phase 4 instructs the fallback to `st.experimental_rerun()` for older pins, and any wrong call surfaces immediately in the manual run.
+- **Existing source-assertion tests.** `tests/test_league_deep_dive_wiring.py`, `tests/test_league_follow_up_wiring.py` and `tests/test_theme_button_styles.py` read page sources; they are frozen and re-run by the final `python -m pytest -q` job, which catches any accidental removal of an existing string.
 
 ## Open questions
-- Assumed `data.load_scores()` exists and returns a DataFrame with a `Venue` column for known-venue matching; if not, `_league_known_venues()` returns `[]` and venue matching keeps the extracted text.
-- Assumed the installed Streamlit supports `st.number_input(..., value=None)` so undetermined fields render blank; if it does not, the Phase 2 blank-field tests will fail and this plan should be revised to use empty text inputs parsed on submit.
-- Assumed Ollama Cloud uses the native `/api/chat` `images` field for `glm-5.3-flash:cloud`; production failures are intentionally swallowed by `extract_scorecard_fields` and covered by injected-fake tests.
+
+- Date format: assumed the app's existing date format is ISO `YYYY-MM-DD`, and that the date widget is `st.date_input` or `st.text_input`. If it is a select box of dates, the prefill drops the date update rather than guessing (assumption: safer to keep the prior value).
+- Known venue list source: assumed the page can pass the league round records it already loads (`list[dict]` or `DataFrame.to_dict("records")`); when it cannot, `_scorecard_known_venues()` returns `[]` and venues are kept as read.
+- Model and credentials: assumed the model name comes from `OLLAMA_SCORECARD_MODEL`/`OLLAMA_MODEL` (env or Streamlit secrets) and that `glm-5.3-flash:cloud` is the correct default; assumed `OLLAMA_API_KEY`/`OLLAMA_KEY` is the bearer token name. If the app's existing key differs, only `_ollama_api_key()`/`_scorecard_model()` need changing (Phase 2).
+- Image type handling: assumed `st.file_uploader(type=None)` (all file types) is acceptable so the unsupported-type path in behaviour 12 is reachable; the reader sniffs magic bytes and treats anything else as "unsupported file type".
+- Widget keys: assumed adding `key=` values to the ten target widgets only, leaving every other widget untouched, is an acceptable change under "otherwise unchanged in layout, fields and defaults".
 
 ## Hand back
 When every phase is built and its Verify block passes:
