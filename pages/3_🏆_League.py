@@ -29,10 +29,15 @@ from league_scorecard import (  # noqa: E402
     LEAGUE_SCORECARD_FIELD_KEYS,
     LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY,
     LeagueScorecardPlayersResult,
+    SCORECARD_THUMBNAIL_WIDTH,
+    SavedScorecard,
     ScorecardPlayerEntry,
     apply_selected_player_scorecard_updates,
+    find_saved_scorecard,
     read_league_scorecard_players,
     scorecard_field_updates,
+    scorecard_github_repo,
+    scorecard_image_url,
     scorecard_upload_fingerprint,
     venue_names_from_records,
 )
@@ -129,6 +134,53 @@ def _scorecard_duplicate_suffix(players: list[ScorecardPlayerEntry], index: int)
     label = players[index].label
     same = [p.index for p in players if p.label == label]
     return f" ({same.index(index) + 1})" if len(same) > 1 else ""
+
+
+# ── Saved scorecard preview (admin score form) ───────────────────────────────
+SAVED_SCORECARD_LABEL = "已存计分卡 Saved scorecard"
+SAVED_SCORECARD_LINK_HINT = "点击缩略图打开原图 Click the thumbnail to open the original"
+SAVED_SCORECARD_VIEW_LABEL = "🔍 查看大图 View"
+
+
+@st.dialog(SAVED_SCORECARD_LABEL, width="large")
+def _saved_scorecard_dialog(scorecard: SavedScorecard) -> None:
+    st.image(scorecard.path)
+
+
+def show_saved_scorecard_dialog(scorecard: SavedScorecard) -> None:
+    _saved_scorecard_dialog(scorecard)
+
+
+def render_league_scorecard_preview(
+    tournament: object,
+    game_label: object,
+    player: object,
+) -> None:
+    """The round's saved scorecard, if it has one: a thumbnail and a button to view it.
+
+    The saved file is shown as it is (no rotation, conversion or caching). When
+    GITHUB_REPO is configured the thumbnail links to the original on GitHub, which
+    opens in a new tab; the View button opens the same file in a dialog.
+    """
+    scorecard = find_saved_scorecard(tournament, game_label, player)
+    if scorecard is None:
+        return
+
+    repo = scorecard_github_repo()
+    url = scorecard_image_url(repo, scorecard.filename)
+    try:
+        st.image(scorecard.path, width=SCORECARD_THUMBNAIL_WIDTH, link=url)
+    except Exception as exc:
+        # A file Streamlit can't display (empty or not an image) must not break the form.
+        scorecard_log.warning("League form: cannot show saved scorecard %r: %r", scorecard.filename, exc)
+        return
+
+    stamp = scorecard.timestamp
+    saved_on = f" · {stamp[:4]}-{stamp[4:6]}-{stamp[6:8]}" if len(stamp) == 14 else ""
+    st.caption(f"{SAVED_SCORECARD_LABEL}{saved_on}" + (f" — {SAVED_SCORECARD_LINK_HINT}" if url else ""))
+
+    if st.button(SAVED_SCORECARD_VIEW_LABEL, key=f"view_saved_scorecard_{scorecard.filename}"):
+        show_saved_scorecard_dialog(scorecard)
 
 
 st.set_page_config(page_title="GCO | 联赛", page_icon="🏆", layout="wide")
@@ -387,6 +439,10 @@ if is_admin_user():
                 "Eagles": 0, "Birdies": 0, "Pars": 0, "Bogeys": 0, "Double_Bogeys": 0
             }
             st.info(f"🆕 {p_sel} 的 {g_sel} 暂无成绩，保存后将创建新纪录。 No score recorded yet — saving will create one.")
+
+        # The scorecard already saved for this round, if there is one, to check the scores against.
+        tournament, game_label, player = t_sel, g_sel, p_sel
+        render_league_scorecard_preview(tournament, game_label, player)
 
         # Scorecard picker above the form: a new image is read once and pre-fills the
         # fields it finds; Save below still uploads it via github_upload_image.
