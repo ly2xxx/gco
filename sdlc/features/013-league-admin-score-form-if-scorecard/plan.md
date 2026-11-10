@@ -1,249 +1,180 @@
-<!-- sdlc stage=plan model=deepseek-v4.1-flash:cloud from=intent.md,spec.md@0b0d8ae -->
+<!-- sdlc stage=plan model=deepseek-v4.1-flash:cloud from=intent.md,spec.md@68f1750 -->
 ## Approach
-Add image lookup, GitHub URL, and cached Pillow JPEG helpers to `league_scorecard.py`, then add a thin Streamlit renderer in `league_scorecard_ui.py` that `pages/3_🏆_League.py` calls after the tournament/game/player selection. The renderer shows a thumbnail from JPEG bytes, an optional GitHub link, and a View dialog; it never constructs or passes a `data:` URL, and every failure path returns without rendering.
+Add pure saved-scorecard filename lookup and raw-GitHub URL helpers to `league_scorecard.py`, then add two thin Streamlit helpers to the league page: one renders the matched file as-is at 160 pixels wide, linking to raw GitHub only when configured, and the other opens the same saved path in a View dialog. Wire the preview to the existing tournament/game/player selections, with no image processing, caching, rotation, or `data:` URLs.
 
 ## Coverage
+
 | Done when (intent.md) | Spec behaviours | Phase |
 | :-- | :-- | :-- |
-| With a tournament, game and player selected that have a matching saved scorecard, the form displays a small upright thumbnail; when more than one file matches, the thumbnail is the one with the newest timestamp in its filename. | 1, 2 | 1, 2, 3 |
-| When `GITHUB_REPO` is set, the thumbnail links to the original file on GitHub and opens in a new tab. | 13, 14 | 1, 3 |
-| The View button opens an upright version of the image in a dialog, and no displayed scorecard image is supplied as a `data:` URL. | 8, 15, 16 | 2, 3 |
-| Changing the selected tournament, game or player updates the thumbnail and dialog image to match, or removes them when nothing matches; no match or incomplete selection shows no thumbnail and no error, and selecting "Game 5" matches game 5 filenames. | 3, 4, 5, 6, 10, 17, 18 | 1, 2, 3 |
-| The existing tests still pass. | 19 | 1, 2, 3 |
+| With a tournament, game and player selected that have a matching saved scorecard, the form displays the saved file as-is at 160 pixels wide; when more than one file matches, the thumbnail is the one with the newest timestamp in its filename. | 1, 2, 3, 4, 5, 13 | 1, 2, 3 |
+| The thumbnail and View dialog show the saved file without rotation or EXIF orientation handling, and no cached thumbnail is used. | 14, 15, 18 | 2 |
+| When `GITHUB_REPO` is set, the thumbnail links to `raw.githubusercontent.com/<repo>/HEAD/scorecard_images/<file>` and opens in a new tab. | 19, 20, 21, 22 | 1, 2 |
+| The View button opens a dialog showing the same saved file as-is, and no displayed scorecard image is supplied as a `data:` URL. | 16, 17, 23 | 2 |
+| Changing the selected tournament, game or player updates the thumbnail and dialog image to match, or removes them when nothing matches; no match or incomplete selection shows no thumbnail and no error, and selecting "Game 5" matches game 5 filenames. | 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 24, 25 | 1, 2, 3 |
+| The existing tests still pass. | 26 | 3 |
 
-## Phase 1: League scorecard image lookup and GitHub URL
+## Phase 1: Saved-scorecard lookup and GitHub URL helpers
 <!-- phase: 1 -->
-<!-- targets: league_scorecard.py, tests/test_league_scorecard_images.py -->
-<!-- frozen: tests/test_league_scorecard_read.py, tests/test_league_scorecard_fields.py, tests/test_league_scorecard_players.py, tests/test_league_scorecard_players_read.py -->
+<!-- targets: league_scorecard.py, tests/test_league_saved_scorecard.py -->
+<!-- frozen: tests/test_league_scorecard_fields.py, tests/test_league_scorecard_players.py, tests/test_league_scorecard_read.py, tests/test_league_scorecard_state.py, tests/test_league_scorecard_wiring.py -->
 
-**Goal:** A reviewer can run the new lookup tests and see that incomplete selections, missing directories and no-match cases return `None`, newest filename timestamp wins, and GitHub URLs are correctly quoted.
+**Goal:** Given a tournament, game label and player, the module returns the newest matching saved scorecard or `None`, and builds the exact raw GitHub URL when configured.
 
 **Changes:**
-- `league_scorecard.py`: add `from pathlib import Path` and `from urllib.parse import quote`; keep existing imports.
-- `league_scorecard.py`: add `SCORECARD_IMAGES_DIR: str = "scorecard_images"`.
-- `league_scorecard.py`: add:
+- `league_scorecard.py`: add module constants after `ScorecardFieldValue`:
+  - `SCORECARD_IMAGES_DIR: str = "scorecard_images"`
+  - `SCORECARD_THUMBNAIL_WIDTH: int = 160`
+  - `SCORECARD_IMAGE_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".gif")`
+- `league_scorecard.py`: add frozen dataclass:
   ```python
   @dataclass(frozen=True)
-  class LeagueScorecardImageMatch:
-      path: Path
-      timestamp: int
+  class SavedScorecard:
+      filename: str
+      path: str
+      timestamp: str
   ```
-- `league_scorecard.py`: add private `_selection_text(value: object) -> str` returning `""` for `None`/`bool`, otherwise `str(value).strip()`.
-- `league_scorecard.py`: add `def game_number_from_selection(selection: object) -> int | None:`
-  - Reject `bool` and `None`.
-  - If `isinstance(selection, int)`, return it only when `selection > 0`, else `None`.
-  - Otherwise use `_selection_text`; fullmatch with `re.fullmatch(r"(?i)\s*(?:game[\s_-]*)?(\d+)\s*", text)`; return `int(group)` only when `> 0`, else `None`.
-  - `"Game 5"`, `"Game_5"`, `"  Game 05  "` and `"5"` return `5`; `""`, `"Game 0"`, `"Game X"`, `0`, `-1` return `None`.
-- `league_scorecard.py`: add:
-  ```python
-  def find_league_scorecard_image(
-      tournament: object,
-      game: object,
-      player: object,
-      *,
-      directory: str | os.PathLike[str] = SCORECARD_IMAGES_DIR,
-  ) -> LeagueScorecardImageMatch | None:
-  ```
-  - `tournament_text = _selection_text(tournament)`, `player_text = _selection_text(player)`; return `None` if either is empty.
-  - `game_no = game_number_from_selection(game)`; return `None` if `None`.
-  - `root = Path(directory)`; return `None` if `not root.is_dir()`.
-  - Iterate `root.iterdir()` inside `try/except OSError`; skip entries where `entry.is_file()` raises `OSError` or returns `False`.
-  - Match `entry.name` with `re.fullmatch(rf"league_{re.escape(tournament_text)}_Game_{game_no}_(?P<player>.+?)_(?P<timestamp>\d+)\.(?P<ext>[^.]+)", entry.name)`; skip if no match or `match.group("player") != player_text`.
-  - Track best by `(timestamp, entry.name)` so ties are deterministic; return `LeagueScorecardImageMatch(path=entry, timestamp=timestamp)`.
-  - Return `None` for missing directory, unreadable directory, or no match.
-- `league_scorecard.py`: add:
-  ```python
-  def scorecard_github_url(
-      repo: str | None,
-      file_name: str,
-      *,
-      branch: str = "main",
-  ) -> str | None:
-  ```
-  - Return `None` when `repo` or `file_name` is blank after stripping.
-  - Strip slashes from `repo`; use `branch or "main"`.
-  - Return `https://github.com/{quote(repo_text, safe="/")}/blob/{quote(branch_text, safe="/")}/scorecard_images/{quote(file_text, safe="")}`.
+- `league_scorecard.py`: add `game_number_from_label(game_label: object) -> int | None`. Convert non-`None` values with `str(...).strip()`, full-match `re.fullmatch(r"game\s+(\d+)", text, re.IGNORECASE)`, and return `int(match.group(1))`. Return `None` for `None`, empty text, or any non-matching label; never raise.
+- `league_scorecard.py`: add `find_saved_scorecard(tournament: object, game_label: object, player: object, *, directory: str = SCORECARD_IMAGES_DIR) -> SavedScorecard | None`.
+  - Return `None` when `tournament` or `player` is `None`/empty/whitespace, or when `game_number_from_label(game_label)` is `None`.
+  - Return `None` when `os.path.isdir(directory)` is false.
+  - Build exact prefix `f"league_{tournament}_Game_{game_number}_{player}_"` using the original tournament/player strings; matching is exact and case-sensitive for those names.
+  - Iterate `os.listdir(directory)` inside `try/except OSError: return None`.
+  - For each filename, use `os.path.splitext(filename)`; keep only suffixes whose lower-case form is in `SCORECARD_IMAGE_SUFFIXES`.
+  - Keep only filenames that `startswith(prefix)`; then the stem remainder after `len(prefix)` must be all digits. This ensures `_Game_5_` does not match `_Game_15_`.
+  - Return `None` when no candidates exist. Otherwise return `max(candidates, key=lambda card: (int(card.timestamp), card.filename))`.
+  - Set `SavedScorecard.path` to `os.path.join(directory, filename)` so default paths are exactly `scorecard_images/<file>`.
+- `league_scorecard.py`: add `scorecard_image_url(repo: str | None, filename: str) -> str | None`. Return `None` when stripped repo is empty or filename is empty. Otherwise return exactly `f"https://raw.githubusercontent.com/{repo_text}/HEAD/scorecard_images/{filename_text}"` with no URL encoding.
+- `league_scorecard.py`: add `scorecard_github_repo() -> str | None` returning `_configured_value(("GITHUB_REPO",))`.
 
 **Definition of done:**
-- [ ] `tests/test_league_scorecard_images.py`, test `test_game_number_from_selection_parses_game_labels`: asserts the positive and rejected values listed above; no fixtures beyond `pytest`.
-- [ ] `tests/test_league_scorecard_images.py`, test `test_find_league_scorecard_image_picks_newest_timestamp`: create `tmp_path` files named `league_2026个人联赛_Game_5_Alice_20260101000000.jpg`, `league_2026个人联赛_Game_5_Alice_20270101000000.jpg`, `league_2026个人联赛_Game_5_Alice_20250101000000.png`, `league_2026个人联赛_Game_4_Alice_20990101000000.jpg`, and `league_other_Game_5_Alice_20990101000000.jpg`; assert the returned `path.name` ends with `20270101000000.jpg` and `timestamp == 20270101000000`.
-- [ ] `tests/test_league_scorecard_images.py`, test `test_find_league_scorecard_image_returns_none_for_incomplete_or_missing`: assert `None` for blank tournament, blank player, `"Game 0"`, missing directory, and no matching player; no teardown needed because `tmp_path` is pytest-managed.
-- [ ] `tests/test_league_scorecard_images.py`, test `test_scorecard_github_url_builds_quoted_blob_url`: assert `scorecard_github_url("owner/repo", "league_2026个人联赛_Game_5_Alice_20260101000000.jpg")` equals `https://github.com/owner/repo/blob/main/scorecard_images/league_2026%E4%B8%AA%E4%BA%BA%E8%81%94%E8%B5%9B_Game_5_Alice_20260101000000.jpg`; assert `None` for blank repo/file and assert a custom `branch="release/2026"` preserves its slash.
+- [ ] `tests/test_league_saved_scorecard.py`, test `test_game_number_from_label_parses_supported_labels`: assert `"Game 5" -> 5`, `"game 15" -> 15`, `"Game 0" -> 0`, and `"Game5"`, `"5"`, `None` all return `None` without raising. Proves spec behaviours 3, 4, 5.
+- [ ] `tests/test_league_saved_scorecard.py`, test `test_find_saved_scorecard_selects_newest_matching_timestamp`: create `league_Cup_Game_2_Alice_20260101000000.jpg` and `league_Cup_Game_2_Alice_20260202000000.png` in `tmp_path`; call with `directory=str(tmp_path)`; assert result equals `SavedScorecard(filename="league_Cup_Game_2_Alice_20260202000000.png", path=str(tmp_path / "league_Cup_Game_2_Alice_20260202000000.png"), timestamp="20260202000000")`. Proves spec behaviour 2.
+- [ ] `tests/test_league_saved_scorecard.py`, test `test_find_saved_scorecard_matches_exact_game_number`: create `_Game_1_`, `_Game_5_`, `_Game_15_` files for the same player; lookup `"Game 5"` and assert only `_Game_5_` is returned. Proves spec behaviours 3 and 4.
+- [ ] `tests/test_league_saved_scorecard.py`, test `test_find_saved_scorecard_returns_none_for_incomplete_selection_or_missing_directory`: assert `None` when tournament, game label or player is empty/`None`, and when `directory` does not exist. Proves spec behaviours 5, 6 and 12.
+- [ ] `tests/test_league_saved_scorecard.py`, test `test_find_saved_scorecard_supports_displayable_suffixes`: create `.jpg`, `.jpeg`, `.png`, `.webp`, `.gif` and `.txt` files; assert an image suffix is returned and `.txt` is ignored. Proves spec behaviour 13.
+- [ ] `tests/test_league_saved_scorecard.py`, test `test_scorecard_image_url_builds_raw_github_url`: assert `scorecard_image_url("owner/repo", "foo.jpg") == "https://raw.githubusercontent.com/owner/repo/HEAD/scorecard_images/foo.jpg"` and blank repo returns `None`. Proves spec behaviours 19 and 20.
+- [ ] `tests/test_league_saved_scorecard.py`, test `test_scorecard_github_repo_reads_environment_and_blank_is_unset`: use `monkeypatch.setenv("GITHUB_REPO", "owner/repo")` then assert the value; `monkeypatch.setenv("GITHUB_REPO", "   ")` and assert `None`. Proves spec behaviours 19 and 20.
+- [ ] No background threads, servers or external resources are started; `tmp_path` and `monkeypatch` handle cleanup.
 
 **Verify:**
 ```bash
-python -m pytest tests/test_league_scorecard_images.py -v
+python -m pytest tests/test_league_saved_scorecard.py -v
 ```
 
 **Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
 
-## Phase 2: Cached upright thumbnail and View JPEGs
+## Phase 2: League page preview and View dialog helpers
 <!-- phase: 2 -->
-<!-- targets: league_scorecard.py, requirements.txt, uv.lock, tests/test_league_scorecard_images_jpeg.py -->
-<!-- frozen: tests/test_league_scorecard_read.py, tests/test_league_scorecard_fields.py, tests/test_league_scorecard_players.py, tests/test_league_scorecard_players_read.py, tests/test_league_scorecard_images.py -->
+<!-- targets: pages/3_🏆_League.py, tests/test_league_saved_scorecard_preview.py -->
+<!-- frozen: league_scorecard.py, tests/test_league_saved_scorecard.py, tests/test_league_scorecard_player_selection.py, tests/test_league_scorecard_player_selector_wiring.py, tests/test_league_scorecard_wiring.py -->
 
-**Goal:** A reviewer can verify from tests that PNG files become JPEG bytes, EXIF orientation is applied, the source file is unchanged, corrupt files return `None`, and identical requests reuse cached bytes without decoding twice.
+**Goal:** The league page exposes a preview helper that renders the matched saved file unchanged at 160 pixels wide, links it only when `GITHUB_REPO` is set, and opens the same saved path in a View dialog.
 
 **Changes:**
-- `requirements.txt`: ensure `Pillow>=10.0,<12` is listed exactly once.
-- `uv.lock`: refresh the lockfile after the `requirements.txt` change using `uv lock`; do not run this from the Verify block.
-- `league_scorecard.py`: add `import io`, `from threading import Lock`, `from PIL import Image, ImageOps`.
-- `league_scorecard.py`: add module-level cache:
+- `pages/3_🏆_League.py`: add these names to the existing `league_scorecard` import list at the top:
   ```python
-  _SCORECARD_JPEG_CACHE: dict[tuple[str, int, int, int, int], bytes] = {}
-  _SCORECARD_JPEG_CACHE_LOCK = Lock()
-  _SCORECARD_JPEG_CACHE_MAX_ENTRIES = 64
+  from league_scorecard import (
+      SCORECARD_THUMBNAIL_WIDTH,
+      SavedScorecard,
+      find_saved_scorecard,
+      scorecard_github_repo,
+      scorecard_image_url,
+  )
   ```
-- `league_scorecard.py`: add private:
+  Merge with the existing import statement rather than adding a second conflicting import.
+- `pages/3_🏆_League.py`: add near the top of the file, after imports:
   ```python
-  def _cached_scorecard_jpeg(
-      path: str | os.PathLike[str],
-      *,
-      max_edge: int,
-      quality: int,
-  ) -> bytes | None:
+  @st.dialog("Saved scorecard")
+  def _saved_scorecard_dialog(scorecard: SavedScorecard) -> None:
+      st.image(scorecard.path)
+
+
+  def show_saved_scorecard_dialog(scorecard: SavedScorecard) -> None:
+      _saved_scorecard_dialog(scorecard)
+
+
+  def render_league_scorecard_preview(
+      tournament: object,
+      game_label: object,
+      player: object,
+  ) -> None:
+      scorecard = find_saved_scorecard(tournament, game_label, player)
+      if scorecard is None:
+          return
+
+      repo = scorecard_github_repo()
+      url = scorecard_image_url(repo, scorecard.filename)
+      if url is not None:
+          st.markdown(
+              f'<a href="{url}" target="_blank" rel="noopener noreferrer">'
+              f'<img src="{url}" width="{SCORECARD_THUMBNAIL_WIDTH}" alt="Saved scorecard">'
+              f'</a>',
+              unsafe_allow_html=True,
+          )
+      else:
+          st.image(scorecard.path, width=SCORECARD_THUMBNAIL_WIDTH)
+
+      if st.button("View", key=f"view_saved_scorecard_{scorecard.filename}"):
+          show_saved_scorecard_dialog(scorecard)
   ```
-  - Return `None` when `max_edge <= 0`.
-  - Clamp `quality` to `1..95` with `int`.
-  - `p = Path(path)`; `stat = p.stat()` inside `try/except OSError` returning `None`.
-  - Key is `(str(p.resolve()), stat.st_mtime_ns, stat.st_size, max_edge, clamped_quality)`.
-  - Under `_SCORECARD_JPEG_CACHE_LOCK`: return cached bytes if key exists; otherwise decode with `Image.open(p)` as a context manager, apply `ImageOps.exif_transpose`, `convert("RGB")`, `thumbnail((max_edge, max_edge), Image.Resampling.LANCZOS)`, save to `io.BytesIO()` with `format="JPEG", quality=clamped_quality, optimize=True`.
-  - Catch `Exception` during open/convert/save and return `None`.
-  - If cache has `>= _SCORECARD_JPEG_CACHE_MAX_ENTRIES`, `clear()` before inserting; return `buffer.getvalue()`.
-  - Hold the lock during decode so the same key is decoded at most once.
-- `league_scorecard.py`: add:
-  ```python
-  def cached_scorecard_thumbnail_jpeg(
-      path: str | os.PathLike[str],
-      *,
-      max_edge: int = 320,
-      quality: int = 85,
-  ) -> bytes | None:
-      return _cached_scorecard_jpeg(path, max_edge=max_edge, quality=quality)
-  ```
-- `league_scorecard.py`: add:
-  ```python
-  def cached_scorecard_view_jpeg(
-      path: str | os.PathLike[str],
-      *,
-      max_edge: int = 1600,
-      quality: int = 90,
-  ) -> bytes | None:
-      return _cached_scorecard_jpeg(path, max_edge=max_edge, quality=quality)
-  ```
+- Do not read image bytes, pass a `data:` URL, rotate, transpose, convert, resize or cache the image. For the non-GitHub thumbnail, pass `scorecard.path` directly to `st.image` with `width=SCORECARD_THUMBNAIL_WIDTH`. For the dialog, pass `scorecard.path` directly to `st.image` with no width.
+- Do not render the View button or any thumbnail when `find_saved_scorecard` returns `None`; return before any Streamlit output.
 
 **Definition of done:**
-- [ ] `tests/test_league_scorecard_images_jpeg.py`, test `test_cached_scorecard_thumbnail_jpeg_converts_png_to_jpeg_and_preserves_file`: create a 20x10 PNG with Pillow, read `before = path.read_bytes()`, call `cached_scorecard_thumbnail_jpeg(path)`, assert returned bytes start with `b"\xff\xd8\xff"`, `Image.open(io.BytesIO(result)).format == "JPEG"`, size `(20, 10)`, and `path.read_bytes() == before`; no teardown needed because `tmp_path` is pytest-managed.
-- [ ] `tests/test_league_scorecard_images_jpeg.py`, test `test_cached_scorecard_thumbnail_jpeg_applies_exif_orientation`: create a 10x20 JPEG, set EXIF tag `274` to `6`, save with `exif=exif`; call thumbnail with `max_edge=320`; assert decoded size is `(20, 10)`.
-- [ ] `tests/test_league_scorecard_images_jpeg.py`, test `test_cached_scorecard_thumbnail_jpeg_is_cached_by_stat_and_parameters`: monkeypatch `league_scorecard.Image.open` to a wrapper that increments `calls`; call `cached_scorecard_thumbnail_jpeg(path, max_edge=320, quality=85)` twice; assert `calls == 1` and both returned byte strings are identical.
-- [ ] `tests/test_league_scorecard_images_jpeg.py`, test `test_cached_scorecard_thumbnail_jpeg_invalidates_on_file_change`: create image A, call thumbnail, overwrite the same path with image B, bump `st_mtime_ns` by `1_000_000_000` with `os.utime(path, ns=(stat.st_atime_ns, stat.st_mtime_ns + 1_000_000_000))`, call again; assert the second bytes differ from the first.
-- [ ] `tests/test_league_scorecard_images_jpeg.py`, test `test_cached_scorecard_view_jpeg_uses_larger_edge`: create a 2000x1000 JPEG; assert thumbnail decoded size `(320, 160)` and view decoded size `(1600, 800)`.
-- [ ] `tests/test_league_scorecard_images_jpeg.py`, test `test_cached_scorecard_thumbnail_jpeg_returns_none_for_corrupt_or_missing`: write `b"not an image"` to a `.jpg` file and call both helpers; assert both return `None`; assert a missing path returns `None`; no teardown needed because monkeypatch restores `Image.open` automatically.
+- [ ] `tests/test_league_saved_scorecard_preview.py`, fixture `page_preview`: read `pages/3_🏆_League.py` with `Path(...).read_text(encoding="utf-8")`, parse with `ast.parse`, keep the `FunctionDef` nodes named `_saved_scorecard_dialog`, `show_saved_scorecard_dialog` and `render_league_scorecard_preview`, then `exec` them into a namespace containing a `FakeStreamlit` object, `SavedScorecard`, `SCORECARD_THUMBNAIL_WIDTH`, `find_saved_scorecard`, `scorecard_github_repo` and `scorecard_image_url`. `FakeStreamlit` records `image(image, width=None)`, `markdown(body, unsafe_allow_html=False)`, `button(label, key=None)` and `dialog(title)`; `dialog` returns a decorator that records the title and returns the wrapped function. No teardown is needed because no threads, servers or files are opened.
+- [ ] `tests/test_league_saved_scorecard_preview.py`, test `test_render_preview_uses_saved_path_at_160px_without_github_repo`: set `find_saved_scorecard` to return `SavedScorecard("foo.jpg", "scorecard_images/foo.jpg", "20260101000000")`, `scorecard_github_repo` to return `None`, and `button_clicked=False`; call `render_league_scorecard_preview(...)`; assert `fake.image_calls == [("scorecard_images/foo.jpg", 160)]`, `fake.markdown_calls == []`, `fake.button_calls[0][0] == "View"`, and no recorded image source or markdown body starts with or contains `data:`. Proves spec behaviours 1, 14, 16, 18 and 22.
+- [ ] `tests/test_league_saved_scorecard_preview.py`, test `test_render_preview_links_thumbnail_when_github_repo_set`: set `scorecard_github_repo` to return `"owner/repo"` and `button_clicked=False`; call the helper with `foo.jpg`; assert one markdown body contains `<a href="https://raw.githubusercontent.com/owner/repo/HEAD/scorecard_images/foo.jpg" target="_blank"`, contains `<img src="https://raw.githubusercontent.com/owner/repo/HEAD/scorecard_images/foo.jpg" width="160"`, and `fake.image_calls == []`. Proves spec behaviours 3, 19 and 21.
+- [ ] `tests/test_league_saved_scorecard_preview.py`, test `test_show_saved_scorecard_dialog_uses_same_saved_path`: call `show_saved_scorecard_dialog(SavedScorecard("foo.jpg", "scorecard_images/foo.jpg", "20260101000000"))`; assert `fake.dialog_title == "Saved scorecard"`, `fake.image_calls == [("scorecard_images/foo.jpg", None)]`, and no source contains `data:`. Proves spec behaviours 4, 15, 17 and 23.
+- [ ] `tests/test_league_saved_scorecard_preview.py`, test `test_view_button_opens_dialog_with_same_path`: set `find_saved_scorecard` to return a card, `scorecard_github_repo` to return `None`, and `button_clicked=True`; call the helper; assert `fake.image_calls == [("scorecard_images/foo.jpg", 160), ("scorecard_images/foo.jpg", None)]` and `fake.dialog_title == "Saved scorecard"`. Proves spec behaviours 4 and 23.
+- [ ] `tests/test_league_saved_scorecard_preview.py`, test `test_no_match_renders_nothing`: set `find_saved_scorecard` to return `None` and `button_clicked=True`; call the helper; assert `fake.image_calls == []`, `fake.markdown_calls == []` and `fake.button_calls == []`. Proves spec behaviours 6, 7, 8, 9, 10 and 11.
+- [ ] `tests/test_league_saved_scorecard_preview.py`, test `test_preview_changes_with_selection`: use a `find_saved_scorecard` stub returning card A for one selection and card B for another; call the helper twice; assert the last `fake.image_calls[0]` uses card B's path. Proves spec behaviours 24 and 25.
 
 **Verify:**
 ```bash
-python -m pytest tests/test_league_scorecard_images_jpeg.py -v
+python -m pytest tests/test_league_saved_scorecard_preview.py -v
 ```
 
 **Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
 
-## Phase 3: Streamlit thumbnail, GitHub link and View dialog
+## Phase 3: Wire preview into the league admin score form
 <!-- phase: 3 -->
-<!-- targets: league_scorecard_ui.py, pages/3_🏆_League.py, tests/test_league_scorecard_ui.py, tests/test_league_scorecard_page_wiring.py -->
-<!-- frozen: tests/test_league_scorecard_read.py, tests/test_league_scorecard_fields.py, tests/test_league_scorecard_players.py, tests/test_league_scorecard_players_read.py, tests/test_league_scorecard_images.py, tests/test_league_scorecard_images_jpeg.py, tests/test_league_scorecard_wiring.py, tests/test_league_scorecard_player_selector_wiring.py, tests/test_league_page_reloads_stale_scorecard_module.py, tests/test_league_scorecard_state.py -->
+<!-- targets: pages/3_🏆_League.py, tests/test_league_saved_scorecard_wiring.py -->
+<!-- frozen: league_scorecard.py, tests/test_league_saved_scorecard.py, tests/test_league_saved_scorecard_preview.py, tests/test_league_scorecard_player_selection.py, tests/test_league_scorecard_player_selector_wiring.py, tests/test_league_scorecard_wiring.py -->
 
-**Goal:** A reviewer can run the UI tests and see that a matched selection renders JPEG bytes, `GITHUB_REPO` adds the GitHub link, View opens the larger upright JPEG, no match/incomplete selection renders nothing, selection changes replace the image, and no `data:` URL is passed.
+**Goal:** The league admin score form calls the preview for its current tournament, game label and player, so a matching selection shows the saved scorecard and changes or missing matches rerender without errors.
 
 **Changes:**
-- New `league_scorecard_ui.py`:
+- `pages/3_🏆_League.py`: inside the existing league admin score entry section, immediately after the tournament selectbox, game-label selectbox and player selectbox values for the score record have been read, add exactly one call with three positional arguments:
   ```python
-  """Streamlit rendering for saved league scorecards."""
-  from __future__ import annotations
-
-  import os
-  from pathlib import Path
-
-  import streamlit as st
-
-  from league_scorecard import (
-      SCORECARD_IMAGES_DIR,
-      cached_scorecard_thumbnail_jpeg,
-      cached_scorecard_view_jpeg,
-      find_league_scorecard_image,
-      scorecard_github_url,
-  )
+  render_league_scorecard_preview(tournament, game_label, player)
   ```
-- New `league_scorecard_ui.py`: add:
-  ```python
-  def _render_scorecard_thumbnail(thumbnail_jpeg: bytes, github_url: str | None) -> None:
-  ```
-  - Build `kwargs: dict[str, object] = {"width": 160, "output_format": "JPEG"}`.
-  - If `github_url` is truthy, add `kwargs["link"] = github_url`.
-  - Call `st.image(thumbnail_jpeg, **kwargs)` inside `try`; on `TypeError`, remove `"link"` from `kwargs`, call `st.image(thumbnail_jpeg, **kwargs)`, and if `github_url` is truthy call `st.link_button("Open original on GitHub", github_url)`.
-- New `league_scorecard_ui.py`: add:
-  ```python
-  def _show_scorecard_view_dialog(view_jpeg: bytes, file_name: str) -> None:
-  ```
-  - `dialog_factory = getattr(st, "dialog", None)`.
-  - If `None`, call `st.image(view_jpeg, width=800, output_format="JPEG")` and return.
-  - Otherwise define `@dialog_factory(f"Scorecard: {file_name}")` on an inner zero-argument function that calls `st.image(view_jpeg, use_container_width=True, output_format="JPEG")`, then call the inner function.
-- New `league_scorecard_ui.py`: add:
-  ```python
-  def render_saved_league_scorecard(
-      *,
-      tournament: object,
-      game: object,
-      player: object,
-      scorecard_images_dir: str | os.PathLike[str] = SCORECARD_IMAGES_DIR,
-      github_repo: str | None = None,
-  ) -> None:
-  ```
-  - `match = find_league_scorecard_image(tournament, game, player, directory=scorecard_images_dir)`; if `None`, return.
-  - `thumbnail = cached_scorecard_thumbnail_jpeg(match.path)`; if `None`, return.
-  - `view = cached_scorecard_view_jpeg(match.path)`; if `None`, return.
-  - `github_url = scorecard_github_url(github_repo, match.path.name)`.
-  - Call `_render_scorecard_thumbnail(thumbnail, github_url)`.
-  - If `st.button("View", key=f"league_scorecard_view_{match.path.name}")`, call `_show_scorecard_view_dialog(view, match.path.name)`.
-  - Do not build or pass any string beginning with `"data:"`.
-- `pages/3_🏆_League.py`: add `import os` if missing; add `from league_scorecard import SCORECARD_IMAGES_DIR` if missing; add `from league_scorecard_ui import render_saved_league_scorecard`.
-- `pages/3_🏆_League.py`: inside the existing league admin score form, immediately after the existing player selection widget is assigned to its local variable and before the score input widgets, call:
-  ```python
-  render_saved_league_scorecard(
-      tournament=selected_tournament,
-      game=selected_game,
-      player=selected_player,
-      scorecard_images_dir=SCORECARD_IMAGES_DIR,
-      github_repo=os.environ.get("GITHUB_REPO"),
-  )
-  ```
-  Use the page’s existing local names for the selected tournament, game label and player; if the page uses different names, pass those exact existing values to the same keyword arguments.
+  Use the same local values that the existing form uses for the score record. If those locals have different names, bind them to `tournament`, `game_label` and `player` immediately before this call. Do not add new session-state keys, widgets, caching, or image processing.
+- Place the call outside any `st.form` submission block so Streamlit reruns when the three selections change; do not defer it until a submit button click.
 
 **Definition of done:**
-- [ ] `tests/test_league_scorecard_ui.py`, test `test_render_shows_thumbnail_and_github_link`: create a real JPEG under `tmp_path` named `league_2026个人联赛_Game_5_Alice_20260101000000.jpg`; monkeypatch `league_scorecard_ui.st.image` to append `(args, kwargs)`, `league_scorecard_ui.st.button` to return `False`, and `league_scorecard_ui.st.link_button` to record calls; call `render_saved_league_scorecard(tournament="2026个人联赛", game="Game 5", player="Alice", scorecard_images_dir=tmp_path, github_repo="owner/repo")`; assert one image call whose first arg is `bytes` starting `b"\xff\xd8\xff"` and whose `kwargs["link"]` equals the expected GitHub blob URL; monkeypatch restores automatically.
-- [ ] `tests/test_league_scorecard_ui.py`, test `test_render_without_github_repo_shows_view_without_link`: same fixture with `github_repo=None`; assert the image kwargs contain no `"link"`, `st.button` was called with `"View"`, and no `st.link_button` call occurred.
-- [ ] `tests/test_league_scorecard_ui.py`, test `test_render_incomplete_or_no_match_does_nothing`: call with blank player and with a real empty `tmp_path`; assert `st.image`, `st.button` and `st.link_button` were never called.
-- [ ] `tests/test_league_scorecard_ui.py`, test `test_view_dialog_uses_upright_view_jpeg`: monkeypatch `league_scorecard_ui.st.button` to return `True`; monkeypatch `league_scorecard_ui.st.dialog` to a factory returning a decorator that immediately calls the wrapped function; monkeypatch `league_scorecard_ui.st.image` to record calls; create a 2000x1000 JPEG; call renderer; assert two image calls, the thumbnail decoded max dimension `320` and the dialog image decoded max dimension `1600`, both JPEG bytes, and no `str` argument starts with `"data:"`.
-- [ ] `tests/test_league_scorecard_ui.py`, test `test_render_updates_on_selection_change_and_removes_when_no_match`: monkeypatch `league_scorecard_ui.find_league_scorecard_image` with side effects `[match_a, match_b, None]`, `league_scorecard_ui.cached_scorecard_thumbnail_jpeg` with side effects `[b"\xff\xd8A", b"\xff\xd8B", None]`, `league_scorecard_ui.cached_scorecard_view_jpeg` with side effects `[b"\xff\xd8viewA", b"\xff\xd8viewB", None]`, and `league_scorecard_ui.st.button` to return `False`; call renderer three times; assert image calls used `b"\xff\xd8A"` then `b"\xff\xd8B"` and no third image call; no background resources to clean up.
-- [ ] `tests/test_league_scorecard_page_wiring.py`, test `test_league_page_imports_and_calls_render_saved_scorecard`: read `Path("pages/3_🏆_League.py").read_text(encoding="utf-8")`; assert `"from league_scorecard_ui import render_saved_league_scorecard"` appears, `"render_saved_league_scorecard("` appears, `"github_repo=os.environ.get(\"GITHUB_REPO\")"` appears, and `"scorecard_images_dir=SCORECARD_IMAGES_DIR"` appears.
+- [ ] `tests/test_league_saved_scorecard_wiring.py`, test `test_league_score_form_calls_saved_scorecard_preview_with_selection_values`: read `pages/3_🏆_League.py`, parse with `ast.parse`, collect all `ast.Call` nodes whose `func` is `ast.Name(id="render_league_scorecard_preview")`; assert exactly one call exists outside the function definition, it has exactly three positional arguments and no keyword arguments, and every argument is a non-constant expression (`ast.Name`, `ast.Attribute` or `ast.Subscript`). Proves the form passes current selection values to the preview. Covers spec behaviours 1, 24 and 25.
+- [ ] `tests/test_league_saved_scorecard_wiring.py`, test `test_league_page_compiles_after_preview_wiring`: call `compile(Path("pages/3_🏆_League.py").read_text(encoding="utf-8"), "pages/3_🏆_League.py", "exec")` and assert it does not raise. Proves the page remains syntactically valid after wiring.
+- [ ] No background threads, servers or external resources are started; the test only reads and compiles source files.
 
 **Verify:**
 ```bash
-python -m pytest tests/test_league_scorecard_ui.py tests/test_league_scorecard_page_wiring.py -v
+python -m pytest tests/test_league_saved_scorecard_wiring.py -v
 ```
 
 **Attempt budget:** 3 failed attempts, then stop and revise this plan instead of retrying.
 
 ## Risks
-- Streamlit may not accept `link=` on `st.image` in the installed version. Phase 3 catches `TypeError` and falls back to `st.image` plus `st.link_button("Open original on GitHub", ...)`; the primary linked-thumbnail path is asserted by `test_render_shows_thumbnail_and_github_link`.
-- Unicode tournament/player names can break GitHub URLs if not quoted. Phase 1 `test_scorecard_github_url_builds_quoted_blob_url` catches this.
-- Filename matching can accidentally pick a stale or wrong file. Phase 1 `test_find_league_scorecard_image_picks_newest_timestamp` and the other-player/other-game cases catch this.
-- Cache keys can fail to invalidate when a file changes. Phase 2 `test_cached_scorecard_thumbnail_jpeg_invalidates_on_file_change` catches this.
-- EXIF orientation can be lost or applied twice. Phase 2 `test_cached_scorecard_thumbnail_jpeg_applies_exif_orientation` and Phase 3 `test_view_dialog_uses_upright_view_jpeg` catch this.
-- The page can call the renderer with incomplete names or not call it at all. Phase 3 `test_render_incomplete_or_no_match_does_nothing` and `test_league_page_imports_and_calls_render_saved_scorecard` catch this.
-- Existing scorecard behaviour could regress. Phase 1/2 frozen tests and the final full suite catch this.
+- Filename matching could accidentally treat `_Game_1_` as matching `_Game_15_`, or could match the wrong player/tournament. Phase 1’s exact-prefix and exact-game tests catch this.
+- A missing `scorecard_images/` directory or an unreadable directory could raise from `os.listdir`. Phase 1 returns `None` on `OSError` and tests the missing-directory path.
+- The GitHub link could be rendered with the wrong URL or without `target="_blank"`. Phase 1 tests the URL helper and Phase 2 tests the markdown anchor.
+- The preview could accidentally pass bytes or a `data:` URL to Streamlit. Phase 2 tests assert the recorded image source is always `scorecard.path` or the raw GitHub URL and never contains `data:`.
+- The View dialog could show a different file from the thumbnail. Phase 2’s button test asserts both the 160-pixel thumbnail and dialog use the same `scorecard.path`.
+- Wiring the preview inside an `st.form` would prevent reruns on selection changes. Phase 3 requires the call outside the form submission block; the source test catches a missing call, and the full final suite catches import/run regressions.
+- Existing league page tests could break if the new imports shadow existing names. Phase 3’s compile test catches syntax/import-name errors in source, and the final full suite catches runtime regressions.
+- Streamlit’s `st.dialog` API could differ from the fake test double. Phase 2 assumes the repository’s Streamlit version supports `st.dialog`; the final full suite and Streamlit verification catch runtime incompatibility.
 
 ## Open questions
-None.
+None. The plan follows the spec assumptions: exact case-sensitive tournament/player matching, supported displayable suffixes only, no URL encoding of the GitHub filename, stable arbitrary tie-break by filename, and no image processing or caching.
 
 ## Hand back
 When every phase is built and its Verify block passes:
