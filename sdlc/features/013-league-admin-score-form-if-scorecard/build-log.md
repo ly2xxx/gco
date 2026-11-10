@@ -46,3 +46,38 @@
 3. **Bilingual labels and a caption, like the rest of the form.** The button is `🔍 查看大图 View` and the dialog title `已存计分卡 Saved scorecard` (the plan: `View`, `Saved scorecard`). A caption under the thumbnail reads `已存计分卡 Saved scorecard · <date from the file name>`, plus `点击缩略图打开原图 Click the thumbnail to open the original` when it is linked. Without a caption the thumbnail sits unlabelled next to the scorecard upload box. The tests check that the labels contain `View` and `Saved scorecard`.
 4. **The dialog is `width="large"`.** The default small dialog is 500 px wide, too narrow to read a scorecard.
 5. **Tests beyond the Definition of done:** an undisplayable file, the page never opening the image itself, and the page's import list.
+
+## Phase 3: Wire preview into the league admin score form
+
+**Status:** passed (local `sdlc_stage.py verify --phase 3`, exit 0)
+
+**Files changed:**
+- `pages/3_🏆_League.py`
+- `tests/test_league_saved_scorecard_wiring.py` (new)
+
+**What was built:** The admin 录入或修改成绩 block calls `render_league_scorecard_preview(tournament, game_label, player)` once, right after the round's existing-score notice and above the scorecard upload box, with the form's own selections (`t_sel`, `g_sel`, `p_sel`). It runs on every rerun outside `st.form`, so changing the player or game updates or removes the thumbnail, and only admins reach it.
+
+**Commands and results:**
+- `python -m pytest tests/test_league_saved_scorecard_wiring.py -q` → 10 passed on Streamlit 1.67.0 and 10 passed on Streamlit 1.55.0
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 013-league-admin-score-form-if-scorecard --phase 3` → **Result: PASSED** (scope: 2 files, all inside the targets; frozen: none touched; contract matches the approved tag; whole suite 274 passed and 17 behave scenarios passed; Phase 1-3 Verify blocks passed)
+- Whole suite on Streamlit 1.55.0 → 264 passed, 10 skipped (the same existing file-upload tests as in Phase 2).
+- Mutation check: with the guard around the thumbnail removed, `test_saved_file_that_cannot_be_displayed_does_not_break_the_form` and `test_file_streamlit_cannot_display_shows_nothing_and_does_not_raise` fail; both pass with the code as committed.
+- Browser check on Streamlit 1.55.0 (the version the deployed app runs): `streamlit run streamlit_app.py` with admin secrets and `GITHUB_REPO = "ly2xxx/gco"` kept outside the repository, the repository's real `scorecard_images/`, driven by Playwright in Chromium.
+  - 李扬 · Game 6, which has no saved card, shows no thumbnail, caption or button.
+  - 李扬 · Game 5 shows the thumbnail 160 px wide, the caption `已存计分卡 Saved scorecard · 2026-11-09 — 点击缩略图打开原图 Click the thumbnail to open the original`, and the `🔍 查看大图 View` button.
+  - Clicking the thumbnail opens a new tab at `https://raw.githubusercontent.com/ly2xxx/gco/HEAD/scorecard_images/league_2026个人联赛_Game_5_李扬_20261109172833.jpg` (that address returns HTTP 200 `image/jpeg`).
+  - View opens the `已存计分卡 Saved scorecard` dialog with the card at 960×1280.
+  - 杨明 · Game 6, a photo saved with EXIF orientation 6, shows as stored (a 160×120 landscape thumbnail), which is the accepted "as it is" behaviour.
+  - No exception on the page.
+
+**Deviations from the plan:**
+1. **Tests beyond the Definition of done.** Besides the plan's two source tests, `tests/test_league_saved_scorecard_wiring.py` has a third source test (the call is in the admin block and above `st.form`) and seven runs of the real page with `AppTest` against a temporary scorecard folder:
+   - the newest card shown as one thumbnail;
+   - the GitHub link when the repository is configured;
+   - View opening the dialog;
+   - changing the selection;
+   - a round with no card;
+   - a visitor who is not an admin;
+   - a file that can't be displayed.
+
+   They use no file upload, so unlike the admin-form tests of features 011 and 012 they also run on Streamlit 1.55.0.

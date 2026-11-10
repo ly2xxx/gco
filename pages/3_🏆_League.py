@@ -440,6 +440,10 @@ if is_admin_user():
             }
             st.info(f"🆕 {p_sel} 的 {g_sel} 暂无成绩，保存后将创建新纪录。 No score recorded yet — saving will create one.")
 
+        # The scorecard already saved for this round, if there is one, to check the scores against.
+        tournament, game_label, player = t_sel, g_sel, p_sel
+        render_league_scorecard_preview(tournament, game_label, player)
+
         # Scorecard picker above the form: a new image is read once and pre-fills the
         # fields it finds; Save below still uploads it via github_upload_image.
         uploaded_scorecard = st.file_uploader(
