@@ -117,8 +117,42 @@ def github_push_state(state: dict) -> bool:
         data = json.dumps(payload).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers, method="PUT")
         with urllib.request.urlopen(req, timeout=15) as resp:
-            return resp.status in (200, 201)
+            pushed = resp.status in (200, 201)
     except Exception:
+        return False
+    if pushed:
+        # Keep backup/ current: startup falls back to the newest file there, so it
+        # must never be older than the live state (see github_push_backup).
+        github_push_backup(state)
+    return pushed
+
+def github_push_backup(state: dict) -> bool:
+    """Commit a dated copy of the state to backup/ in the GitHub repo.
+
+    The app falls back to the newest backup/gco_backup_*.json when it restarts
+    without usable local data. Writing one on every save means that fallback
+    always holds the latest state instead of an old snapshot. Never raises;
+    a failure here does not fail the save.
+    """
+    try:
+        import streamlit as st
+        headers = _gh_headers()
+        repo = st.secrets.get("GITHUB_REPO", "")
+        if not headers or not repo:
+            return False
+        name = f"gco_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        url = f"https://api.github.com/repos/{repo}/contents/backup/{name}"
+        payload = {
+            "message": f"chore: backup GCO state [{name}]",
+            "content": base64.b64encode(
+                json.dumps(state, ensure_ascii=False, indent=2).encode("utf-8")
+            ).decode("ascii"),
+        }
+        req = urllib.request.Request(url, data=json.dumps(payload).encode("utf-8"), headers=headers, method="PUT")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return resp.status in (200, 201)
+    except Exception as e:
+        print(f"Error writing state backup to GitHub: {e}")
         return False
 
 def github_upload_image(file_bytes: bytes, file_name: str) -> bool:
