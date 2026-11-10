@@ -1,109 +1,103 @@
-<!-- sdlc stage=spec model=deepseek-v4.1-flash:cloud from=intent.md@b3dec5d -->
+<!-- sdlc stage=spec model=deepseek-v4.1-flash:cloud from=intent.md@ff88398 -->
 ## Summary
-The league admin score form will show the newest saved scorecard thumbnail for the selected tournament, game and player, with an optional GitHub link and a View dialog. When the selection is incomplete, no matching file exists, or the image cannot be read, the form keeps its current behaviour without showing an image or raising an error.
+The league admin score form will show the saved scorecard image for the selected tournament, game and player when a matching file exists in `scorecard_images/`. The thumbnail is the saved file shown at 160 pixels wide, can link to the raw GitHub URL when `GITHUB_REPO` is set, and can be opened as-is in a View dialog. Incomplete selections and missing matches render nothing and do not error.
 
 ## Behaviour
-1. Given a tournament, game and player are all non-empty and at least one file in `scorecard_images/` matches `league_<tournament>_Game_<N>_<player>_<timestamp>.<ext>`, when the league admin score form renders that selection, then a scorecard thumbnail is displayed.
-2. Given more than one file matches the same tournament, game and player, when the form renders, then the displayed thumbnail is from the matching file with the greatest numeric timestamp segment in its filename.
-3. Given the selected game label is `Game 5`, when saved scorecards are matched, then filenames containing `Game_5` are treated as game number 5.
-4. Given any of tournament, game or player is missing, blank, or has no positive game number, when the form renders, then no thumbnail, no GitHub link and no View button are shown and no error is raised.
-5. Given no file matches the selection, when the form renders, then no thumbnail, no GitHub link and no View button are shown and no error is raised.
-6. Given `scorecard_images/` is missing or cannot be listed, when the form renders, then no thumbnail, no GitHub link and no View button are shown and no error is raised.
-7. Given a matching saved file is a non-JPEG image such as `.png`, when its thumbnail is generated, then the returned thumbnail bytes are JPEG.
-8. Given a matching saved file has EXIF orientation metadata, when its thumbnail or View image is generated, then the returned JPEG is upright with the orientation applied.
-9. Given a matching saved file is converted into a thumbnail or View image, when the operation completes, then the stored file’s bytes are unchanged.
-10. Given a matching saved file is corrupt or not a readable image, when the form renders, then no thumbnail, no GitHub link and no View button are shown and no error is raised.
-11. Given the same matched file, unchanged modification time, unchanged size and the same thumbnail parameters, when the thumbnail is requested twice, then identical JPEG bytes are returned and the file is decoded at most once.
-12. Given the matched file changes on disk or the selection changes to a different matched file, when the thumbnail is requested, then the cached old thumbnail is not returned.
-13. Given `GITHUB_REPO` is set and a match exists, when the thumbnail is rendered, then the thumbnail is wrapped in an anchor whose `href` is the GitHub URL for the original file in `scorecard_images/` and whose target opens a new tab.
-14. Given `GITHUB_REPO` is not set and a match exists, when the form renders, then the thumbnail has no GitHub anchor and the View button is still available.
-15. Given a match is displayed, when the user activates View, then a dialog displays an upright, larger JPEG version of the same saved scorecard.
-16. Given any scorecard image is displayed, when the page rendering calls are inspected, then the page has not constructed or passed a `data:` URL for that image.
-17. Given a match is displayed and the selection changes to another tournament, game or player with a match, when the form rerenders, then the thumbnail and dialog image update to the new match.
-18. Given a match is displayed and the selection changes so that nothing matches, when the form rerenders, then the thumbnail, GitHub link and View button are removed.
-19. Given the repository’s existing test suite, when it runs after the change, then all pre-existing tests pass.
+1. Given a selected tournament, a selected `Game <N>` label and a selected player with exactly one matching saved file, when the league admin score form renders, then the form renders that saved file as a thumbnail at 160 pixels wide.
+2. Given multiple saved files match the selected tournament, game number and player, when the form renders, then the thumbnail is the matching file whose filename timestamp segment is greatest.
+3. Given the selected game label is `"Game 5"`, when saved scorecard lookup runs, then it matches filenames containing `_Game_5_`.
+4. Given the selected game label is `"Game 5"`, when saved scorecard lookup runs, then it does not match filenames containing `_Game_1_` or `_Game_15_`.
+5. Given the selected game label cannot be parsed as `Game <number>`, when saved scorecard lookup runs, then the lookup returns no saved scorecard and raises no exception.
+6. Given any one of tournament, game label or player is missing or empty, when the form renders, then no scorecard thumbnail is rendered.
+7. Given any one of tournament, game label or player is missing or empty, when the form renders, then no View button is rendered.
+8. Given any one of tournament, game label or player is missing or empty, when the form renders, then no Streamlit error is rendered.
+9. Given no saved file matches the selected tournament, game number and player, when the form renders, then no scorecard thumbnail is rendered.
+10. Given no saved file matches, when the form renders, then no View button is rendered.
+11. Given no saved file matches, when the form renders, then no Streamlit error is rendered.
+12. Given the `scorecard_images/` directory is absent, when saved scorecard lookup runs, then the lookup returns no saved scorecard and raises no exception.
+13. Given a matching saved file has a Streamlit-displayable non-JPEG extension such as `.png`, `.jpeg`, `.webp` or `.gif`, when the form renders, then the thumbnail uses that saved file path with no conversion.
+14. Given a matching saved image contains EXIF orientation metadata, when the form renders the thumbnail, then the image source is the original saved file path and no rotated, transformed or cached image path is used.
+15. Given a matching saved image contains EXIF orientation metadata, when the View dialog renders the image, then the image source is the same original saved file path and no rotated, transformed or cached image path is used.
+16. Given a matching saved image is displayed, when the thumbnail renders, then no image source passed to Streamlit begins with `data:`.
+17. Given a matching saved image is displayed, when the View dialog renders the image, then no image source passed to Streamlit begins with `data:`.
+18. Given a matching saved image is displayed, when the same selection is rendered again, then the thumbnail still uses the saved file path from `scorecard_images/<file>` rather than a cached thumbnail path.
+19. Given `GITHUB_REPO` is set to `owner/repo` and the matching filename is `foo.jpg`, when the GitHub URL helper is called, then it returns `https://raw.githubusercontent.com/owner/repo/HEAD/scorecard_images/foo.jpg`.
+20. Given `GITHUB_REPO` is unset or blank, when the GitHub URL helper is called, then it returns no URL.
+21. Given `GITHUB_REPO` is set and a match exists, when the thumbnail renders, then the thumbnail is a link to the raw GitHub URL and the link target is `_blank`.
+22. Given `GITHUB_REPO` is unset and a match exists, when the thumbnail renders, then no external link is rendered around the thumbnail.
+23. Given a match exists, when the View button is activated, then the dialog renders the same saved file path as the thumbnail as-is.
+24. Given a match is displayed, when the selected tournament, game or player changes to a different match, then the thumbnail and View dialog image use the newly matched saved file path.
+25. Given a match is displayed, when the selection changes to one with no match, then no scorecard thumbnail and no View button are rendered.
+26. Given the existing test suite, when the full suite runs, then all existing tests pass.
 
 ## Interfaces
 
-`league_scorecard.py`
-```python
-from pathlib import Path
+**`league_scorecard.py`**
 
+```python
 SCORECARD_IMAGES_DIR: str = "scorecard_images"
+SCORECARD_THUMBNAIL_WIDTH: int = 160
+SCORECARD_IMAGE_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".gif")
 
 
 @dataclass(frozen=True)
-class LeagueScorecardImageMatch:
-    path: Path
-    timestamp: int
+class SavedScorecard:
+    filename: str
+    path: str
+    timestamp: str
 
 
-def game_number_from_selection(selection: object) -> int | None: ...
+def game_number_from_label(game_label: object) -> int | None: ...
 
 
-def find_league_scorecard_image(
+def find_saved_scorecard(
     tournament: object,
-    game: object,
+    game_label: object,
     player: object,
     *,
-    directory: str | os.PathLike[str] = SCORECARD_IMAGES_DIR,
-) -> LeagueScorecardImageMatch | None: ...
+    directory: str = SCORECARD_IMAGES_DIR,
+) -> SavedScorecard | None: ...
 
 
-def cached_scorecard_thumbnail_jpeg(
-    path: str | os.PathLike[str],
-    *,
-    max_edge: int = 320,
-    quality: int = 85,
-) -> bytes | None: ...
+def scorecard_image_url(repo: str | None, filename: str) -> str | None: ...
 
 
-def cached_scorecard_view_jpeg(
-    path: str | os.PathLike[str],
-    *,
-    max_edge: int = 1600,
-    quality: int = 90,
-) -> bytes | None: ...
-
-
-def scorecard_github_url(
-    repo: str | None,
-    file_name: str,
-    *,
-    branch: str = "main",
-) -> str | None: ...
+def scorecard_github_repo() -> str | None: ...
 ```
 
-`pages/3_🏆_League.py`
+`scorecard_github_repo` reads `GITHUB_REPO` using the module’s existing configured-value behaviour, treating blank as unset.
+
+**`pages/3_🏆_League.py`**
+
 ```python
-def render_saved_league_scorecard(
-    *,
+def render_league_scorecard_preview(
     tournament: object,
-    game: object,
+    game_label: object,
     player: object,
-    scorecard_images_dir: str | os.PathLike[str] = SCORECARD_IMAGES_DIR,
-    github_repo: str | None = None,
 ) -> None: ...
+
+
+def show_saved_scorecard_dialog(scorecard: SavedScorecard) -> None: ...
 ```
 
 ## Out of scope
 - Uploading, replacing, deleting or rotating stored scorecard image files.
-- Reading scores from the image or auto-filling the form from it.
+- Applying EXIF orientation, rotating, converting or resizing scorecard images for display.
+- Pillow-based image processing, generated thumbnails or caching of scorecard images.
+- Reading scores from the image or auto-filling the score form.
 - Cup, outing or other non-league scorecards.
-- Showing scorecards anywhere other than the league admin score form.
-- Image conversion or resizing on disk.
+- Showing saved scorecards anywhere other than the league admin score form.
 - Changing how scorecards are named or stored.
-- `data:` URL image embedding or a fallback that puts image bytes directly into the page.
+- `data:` URL image embedding or any fallback that puts image bytes directly into the page.
 - Changing the GitHub repository layout or adding another image host.
+- Fetching or validating the raw GitHub URL server-side.
 
 ## Open questions
-- Does “selected” require all three of tournament, game and player? Assumed yes: any missing value means nothing is shown.
-- When `GITHUB_REPO` is not set, should the thumbnail itself open a larger image? Assumed no: the View dialog is the in-app enlargement.
-- Are non-JPEG saved scorecards in scope? Assumed yes; thumbnails and View images are produced as JPEG in memory, and the original file is untouched.
-- What is the cache lifetime? Assumed the cache is keyed by path, modification time, size, max edge and quality; eviction details are left to implementation.
-- What counts as “newest”? Assumed the timestamp segment in the filename, not file modification time.
-- What happens when two files share the same filename timestamp? Assumed a deterministic choice is acceptable; tests avoid depending on which file wins.
-- What format does `GITHUB_REPO` use and which branch? Assumed `owner/repo` with branch `main`, producing a GitHub blob URL for the original file.
-- What thumbnail and View sizes should be used? Assumed 320 px max edge for thumbnails and 1600 px max edge for the View image.
-- Does “not supplied as `data:` URLs” forbid using the framework’s standard image element with JPEG bytes? Assumed the application code must not construct or pass `data:` URLs, while using Streamlit’s image API with JPEG bytes is acceptable.
-- What if a matching filename exists but the image cannot be decoded? Assumed the form behaves as if no scorecard matched, with no error.
+- Displayable saved files are assumed to be `.jpg`, `.jpeg`, `.png`, `.webp` and `.gif`; other extensions are ignored.
+- Tournament and player matching is assumed to be exact and case-sensitive, with no name normalisation.
+- `Game 5` parsing is assumed to accept `Game` followed by whitespace and digits, case-insensitively; other label forms do not match.
+- When multiple matching files share the same filename timestamp, an arbitrary but stable choice is assumed; no additional tie-break rule is required.
+- The View dialog is assumed to show the saved file as-is without the 160-pixel thumbnail width constraint.
+- When `GITHUB_REPO` is unset, the thumbnail is assumed to have no separate enlarge action; the View dialog is the in-app enlargement.
+- `scorecard_images/` is assumed to be resolved relative to the application/repository working directory.
+- The raw GitHub URL is assumed to use the `https://` scheme and to insert the filename into the path without application-level URL encoding.
