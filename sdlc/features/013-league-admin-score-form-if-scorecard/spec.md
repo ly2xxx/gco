@@ -1,62 +1,109 @@
-<!-- sdlc stage=spec model=deepseek-v4.1-flash:cloud from=intent.md@a1cadb0 -->
+<!-- sdlc stage=spec model=deepseek-v4.1-flash:cloud from=intent.md@b3dec5d -->
 ## Summary
-The league admin score form now looks up the scorecard image saved for the currently selected tournament, game number and player, and shows a clickable thumbnail when a match exists. Matching stays in `league_scorecard.py` and the league admin score form in `pages/3_🏆_League.py` is the only page changed.
+The league admin score form will show the newest saved scorecard thumbnail for the selected tournament, game and player, with an optional GitHub link and a View dialog. When the selection is incomplete, no matching file exists, or the image cannot be read, the form keeps its current behaviour without showing an image or raising an error.
 
 ## Behaviour
-1. Given a selected tournament, game number and player for which exactly one file in `scorecard_images/` matches `league_<tournament>_Game_<game>_<player>_<14-digit timestamp>.<ext>`, when the league admin score form renders, then it shows a thumbnail of that file.
-2. Given more than one file matches the selected tournament, game number and player, when the form resolves the scorecard image, then it uses the matching file whose filename timestamp segment is greatest.
-3. Given matching files have filenames whose timestamps disagree with filesystem modification times, when the form resolves the scorecard image, then the filename timestamp decides which file is shown.
-4. Given a thumbnail is shown, when the admin activates the thumbnail, then the full-size image for that same file is opened.
-5. Given a thumbnail is shown for one selection, when the selected tournament changes to another value with a matching file, then the form shows the thumbnail for the new tournament.
-6. Given a thumbnail is shown for one selection, when the selected game number changes to another value with a matching file, then the form shows the thumbnail for the new game number.
-7. Given a thumbnail is shown for one selection, when the selected player changes to another value with a matching file, then the form shows the thumbnail for the new player.
-8. Given a thumbnail is shown, when any of the selected tournament, game number or player changes to a combination with no matching file, then the form shows no thumbnail and shows no error.
-9. Given any of the selected tournament, game number or player is missing or empty, when the form renders, then no thumbnail is shown and no error is shown.
-10. Given no file matches the selected tournament, game number and player, when the form renders, then no thumbnail is shown and no error is shown.
-11. Given the scorecard images directory is empty or does not exist, when the form renders with three selected values, then no thumbnail is shown and no error is shown.
-12. Given a matching file has a non-empty extension other than `.jpg`, when its tournament, game number and player match, then it is treated as a matching scorecard.
-13. Given a file in `scorecard_images/` does not have the exact selected tournament, exact `Game_<game>` segment, exact selected player, and a 14-digit timestamp before its extension, when the form resolves the scorecard image, then that file is ignored.
-14. Given two matching files share the greatest timestamp, when the form resolves the scorecard image repeatedly, then it returns the same one of those files each time and does not error.
-15. Given the existing test suite, when it runs, then it still passes.
+1. Given a tournament, game and player are all non-empty and at least one file in `scorecard_images/` matches `league_<tournament>_Game_<N>_<player>_<timestamp>.<ext>`, when the league admin score form renders that selection, then a scorecard thumbnail is displayed.
+2. Given more than one file matches the same tournament, game and player, when the form renders, then the displayed thumbnail is from the matching file with the greatest numeric timestamp segment in its filename.
+3. Given the selected game label is `Game 5`, when saved scorecards are matched, then filenames containing `Game_5` are treated as game number 5.
+4. Given any of tournament, game or player is missing, blank, or has no positive game number, when the form renders, then no thumbnail, no GitHub link and no View button are shown and no error is raised.
+5. Given no file matches the selection, when the form renders, then no thumbnail, no GitHub link and no View button are shown and no error is raised.
+6. Given `scorecard_images/` is missing or cannot be listed, when the form renders, then no thumbnail, no GitHub link and no View button are shown and no error is raised.
+7. Given a matching saved file is a non-JPEG image such as `.png`, when its thumbnail is generated, then the returned thumbnail bytes are JPEG.
+8. Given a matching saved file has EXIF orientation metadata, when its thumbnail or View image is generated, then the returned JPEG is upright with the orientation applied.
+9. Given a matching saved file is converted into a thumbnail or View image, when the operation completes, then the stored file’s bytes are unchanged.
+10. Given a matching saved file is corrupt or not a readable image, when the form renders, then no thumbnail, no GitHub link and no View button are shown and no error is raised.
+11. Given the same matched file, unchanged modification time, unchanged size and the same thumbnail parameters, when the thumbnail is requested twice, then identical JPEG bytes are returned and the file is decoded at most once.
+12. Given the matched file changes on disk or the selection changes to a different matched file, when the thumbnail is requested, then the cached old thumbnail is not returned.
+13. Given `GITHUB_REPO` is set and a match exists, when the thumbnail is rendered, then the thumbnail is wrapped in an anchor whose `href` is the GitHub URL for the original file in `scorecard_images/` and whose target opens a new tab.
+14. Given `GITHUB_REPO` is not set and a match exists, when the form renders, then the thumbnail has no GitHub anchor and the View button is still available.
+15. Given a match is displayed, when the user activates View, then a dialog displays an upright, larger JPEG version of the same saved scorecard.
+16. Given any scorecard image is displayed, when the page rendering calls are inspected, then the page has not constructed or passed a `data:` URL for that image.
+17. Given a match is displayed and the selection changes to another tournament, game or player with a match, when the form rerenders, then the thumbnail and dialog image update to the new match.
+18. Given a match is displayed and the selection changes so that nothing matches, when the form rerenders, then the thumbnail, GitHub link and View button are removed.
+19. Given the repository’s existing test suite, when it runs after the change, then all pre-existing tests pass.
 
 ## Interfaces
-In `league_scorecard.py`:
 
+`league_scorecard.py`
 ```python
-SCORECARD_IMAGES_DIR: str = os.path.join(os.path.dirname(__file__), "scorecard_images")
+from pathlib import Path
+
+SCORECARD_IMAGES_DIR: str = "scorecard_images"
+
+
+@dataclass(frozen=True)
+class LeagueScorecardImageMatch:
+    path: Path
+    timestamp: int
+
+
+def game_number_from_selection(selection: object) -> int | None: ...
+
 
 def find_league_scorecard_image(
-    tournament: str | None,
-    game_number: int | str | None,
-    player: str | None,
+    tournament: object,
+    game: object,
+    player: object,
     *,
-    images_dir: str | os.PathLike[str] = SCORECARD_IMAGES_DIR,
-) -> str | None:
-    ...
+    directory: str | os.PathLike[str] = SCORECARD_IMAGES_DIR,
+) -> LeagueScorecardImageMatch | None: ...
+
+
+def cached_scorecard_thumbnail_jpeg(
+    path: str | os.PathLike[str],
+    *,
+    max_edge: int = 320,
+    quality: int = 85,
+) -> bytes | None: ...
+
+
+def cached_scorecard_view_jpeg(
+    path: str | os.PathLike[str],
+    *,
+    max_edge: int = 1600,
+    quality: int = 90,
+) -> bytes | None: ...
+
+
+def scorecard_github_url(
+    repo: str | None,
+    file_name: str,
+    *,
+    branch: str = "main",
+) -> str | None: ...
 ```
 
-`find_league_scorecard_image` returns the joined path to the newest matching image, or `None` when any input is missing, no file matches, or the directory cannot be read. It reads directory entries only; it does not read image bytes, write files, resize images or make network calls.
-
-In `pages/3_🏆_League.py`:
-
+`pages/3_🏆_League.py`
 ```python
-def render_league_scorecard_thumbnail(image_path: str | None) -> None:
-    ...
+def render_saved_league_scorecard(
+    *,
+    tournament: object,
+    game: object,
+    player: object,
+    scorecard_images_dir: str | os.PathLike[str] = SCORECARD_IMAGES_DIR,
+    github_repo: str | None = None,
+) -> None: ...
 ```
-
-`render_league_scorecard_thumbnail` shows nothing when `image_path` is `None`. When a path is supplied, it shows a clickable thumbnail that opens the same full-size image path. The league admin score form calls `find_league_scorecard_image` with the selected tournament, selected game number and selected player after those values are known, then passes the result to `render_league_scorecard_thumbnail`.
 
 ## Out of scope
-- Uploading, replacing, deleting or rotating scorecard images.
-- Reading scores from the image or auto-filling the form from the image.
+- Uploading, replacing, deleting or rotating stored scorecard image files.
+- Reading scores from the image or auto-filling the form from it.
 - Cup, outing or other non-league scorecards.
 - Showing scorecards anywhere other than the league admin score form.
-- Image conversion, resizing on disk, thumbnail generation or caching.
-- Any change to how scorecard images are named or stored.
-- Any network, secret or manual-step dependency for the automated tests.
+- Image conversion or resizing on disk.
+- Changing how scorecards are named or stored.
+- `data:` URL image embedding or a fallback that puts image bytes directly into the page.
+- Changing the GitHub repository layout or adding another image host.
 
 ## Open questions
-- Filename matching for tournament and player is assumed to be exact and case-sensitive, because the intent specifies a filename pattern rather than a fuzzy match.
-- Game numbers are assumed to be matched as the decimal number in `Game_<game>` with no extra leading-zero handling; the page passes the selected numeric game value.
-- “Any extension” is assumed to mean any non-empty extension segment after the 14-digit timestamp; formats that Streamlit itself cannot display are not converted by this change.
-- A tie on the greatest timestamp is assumed to be resolved by a deterministic filename ordering, because the intent only requires a stable arbitrary choice.
+- Does “selected” require all three of tournament, game and player? Assumed yes: any missing value means nothing is shown.
+- When `GITHUB_REPO` is not set, should the thumbnail itself open a larger image? Assumed no: the View dialog is the in-app enlargement.
+- Are non-JPEG saved scorecards in scope? Assumed yes; thumbnails and View images are produced as JPEG in memory, and the original file is untouched.
+- What is the cache lifetime? Assumed the cache is keyed by path, modification time, size, max edge and quality; eviction details are left to implementation.
+- What counts as “newest”? Assumed the timestamp segment in the filename, not file modification time.
+- What happens when two files share the same filename timestamp? Assumed a deterministic choice is acceptable; tests avoid depending on which file wins.
+- What format does `GITHUB_REPO` use and which branch? Assumed `owner/repo` with branch `main`, producing a GitHub blob URL for the original file.
+- What thumbnail and View sizes should be used? Assumed 320 px max edge for thumbnails and 1600 px max edge for the View image.
+- Does “not supplied as `data:` URLs” forbid using the framework’s standard image element with JPEG bytes? Assumed the application code must not construct or pass `data:` URLs, while using Streamlit’s image API with JPEG bytes is acceptable.
+- What if a matching filename exists but the image cannot be decoded? Assumed the form behaves as if no scorecard matched, with no error.
