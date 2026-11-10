@@ -12,6 +12,7 @@ import socket
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Mapping as AbcMapping
 from collections.abc import MutableMapping as AbcMutableMapping  # noqa: F401
@@ -56,6 +57,12 @@ def _excerpt(text: object, limit: int = LOG_EXCERPT_CHARS) -> str:
     return f"{flat[:limit]}… (+{len(flat) - limit} chars)"
 
 ScorecardFieldValue = str | int
+
+# Saved scorecard images: the folder the League page's Save uploads to (through GitHub),
+# the width of the thumbnail shown for one, and the file types Streamlit can display.
+SCORECARD_IMAGES_DIR: str = "scorecard_images"
+SCORECARD_THUMBNAIL_WIDTH: int = 160
+SCORECARD_IMAGE_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".gif")
 
 LEAGUE_SCORECARD_FIELD_KEYS: tuple[str, ...] = (
     "date",
@@ -771,3 +778,87 @@ def apply_selected_player_scorecard_updates(
 def scorecard_upload_fingerprint(file_name: str, payload: bytes) -> str:
     """Stable id of one selected file, so the same upload is read only once."""
     return hashlib.sha256(str(file_name).encode("utf-8") + b"\x00" + bytes(payload or b"")).hexdigest()
+
+
+# ---------------------------------------------------------------- saved scorecard images
+
+@dataclass(frozen=True)
+class SavedScorecard:
+    filename: str
+    path: str
+    timestamp: str
+
+
+def game_number_from_label(game_label: object) -> int | None:
+    """5 for "Game 5"; None for anything that is not "Game <number>". Never raises."""
+    if game_label is None:
+        return None
+    try:
+        match = re.fullmatch(r"game\s+(\d+)", str(game_label).strip(), re.IGNORECASE | re.ASCII)
+    except Exception:
+        return None
+    return int(match.group(1)) if match else None
+
+
+def find_saved_scorecard(
+    tournament: object,
+    game_label: object,
+    player: object,
+    *,
+    directory: str = SCORECARD_IMAGES_DIR,
+) -> SavedScorecard | None:
+    """The newest saved scorecard image for one tournament, game and player, or None.
+
+    The League page saves a card as ``league_<tournament>_<game>_<player>_<timestamp>.<ext>``
+    with spaces written as ``_`` (``league_2026个人联赛_Game_5_李扬_20261109172833.jpg``).
+    Names are matched exactly; the greatest timestamp in the file name wins. Only file
+    names are read, never the images, and nothing is raised for a missing folder.
+    """
+    if tournament is None or player is None:
+        return None
+    tournament_text, player_text = str(tournament), str(player)
+    game_number = game_number_from_label(game_label)
+    if not tournament_text.strip() or not player_text.strip() or game_number is None:
+        return None
+    if not os.path.isdir(directory):
+        return None
+    prefix = f"league_{tournament_text}_Game_{game_number}_{player_text}_".replace(" ", "_")
+    try:
+        filenames = os.listdir(directory)
+    except OSError:
+        return None
+    candidates: list[SavedScorecard] = []
+    for filename in filenames:
+        stem, suffix = os.path.splitext(filename)
+        if suffix.lower() not in SCORECARD_IMAGE_SUFFIXES or not stem.startswith(prefix):
+            continue
+        timestamp = stem[len(prefix):]
+        # All digits, so "Game 5" never picks up "..._Game_5_<player>_extra_<timestamp>".
+        if not (timestamp.isascii() and timestamp.isdigit()):
+            continue
+        candidates.append(
+            SavedScorecard(filename=filename, path=os.path.join(directory, filename), timestamp=timestamp)
+        )
+    if not candidates:
+        return None
+    return max(candidates, key=lambda card: (int(card.timestamp), card.filename))
+
+
+def scorecard_image_url(repo: str | None, filename: str) -> str | None:
+    """The saved scorecard's address on GitHub (the original file), or None without a repo.
+
+    ``HEAD`` is the repository's default branch, so no branch name is needed.
+    """
+    repo_text = "" if repo is None else str(repo).strip()
+    filename_text = "" if filename is None else str(filename).strip()
+    if not repo_text or not filename_text:
+        return None
+    return (
+        f"https://raw.githubusercontent.com/{repo_text}/HEAD/scorecard_images/"
+        f"{urllib.parse.quote(filename_text)}"
+    )
+
+
+def scorecard_github_repo() -> str | None:
+    """``owner/repo`` from GITHUB_REPO (environment, then Streamlit secrets); None when unset."""
+    return _configured_value(("GITHUB_REPO",))
