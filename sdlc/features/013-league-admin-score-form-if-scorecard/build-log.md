@@ -20,3 +20,29 @@
 2. **Spaces in the tournament and player are matched as `_`.** The League page names uploads with `.replace(" ", "_")`, so a "Li Yang" round is saved as `…_Li_Yang_…`; the plan's prefix, built from the original strings, would never find it. No current name has a space. Matching is otherwise exact and case-sensitive, as planned.
 3. **The suffix check ignores case** (`.JPG` counts), since phones save upper-case extensions.
 4. **Tests beyond the Definition of done:** the constants, an unlistable folder (`OSError`), other tournaments, players and non-timestamp names, Chinese and spaced names, quoting, file names only (no `open`), and the Streamlit-secrets fallback of `scorecard_github_repo`. The repo test replaces `streamlit.secrets` with `{}` so a developer's own `.streamlit/secrets.toml` can't change its result.
+
+## Phase 2: League page preview and View dialog helpers
+
+**Status:** passed (local `sdlc_stage.py verify --phase 2`, exit 0)
+
+**Files changed:**
+- `pages/3_🏆_League.py`
+- `tests/test_league_saved_scorecard_preview.py` (new)
+
+**What was built:** `render_league_scorecard_preview` looks up the round's saved scorecard and, when there is one, shows the saved file as it is at 160 pixels wide with `st.image`, a one-line caption and a View button; the button calls `show_saved_scorecard_dialog`, which shows the same path in an `st.dialog`. With `GITHUB_REPO` configured the thumbnail carries the raw GitHub address as its link, so a click opens the original in a new tab. Nothing is rendered when no file matches.
+
+**Commands and results:**
+- `python -m pytest tests/test_league_saved_scorecard_preview.py -q` → 9 passed
+- `python ../.github/actions/sdlc-stage/sdlc_stage.py verify --test-command 'python -m pytest -q && behave --format progress' --feature 013-league-admin-score-form-if-scorecard --phase 2` → **Result: PASSED** (scope: 2 files, all inside the targets; frozen: none touched; contract matches the approved tag; whole suite 264 passed; Phase 1 and 2 Verify blocks passed)
+- Whole suite on Streamlit 1.55.0, the version the deployed app runs → 254 passed, 10 skipped. The 10 are the existing admin-form tests of features 011 and 012, which need `AppTest`'s file-uploader support; they were skipped on 1.55.0 before this feature too.
+
+**Deviations from the plan:**
+1. **The linked thumbnail is `st.image(scorecard.path, width=160, link=url)`, not a hand-written `<a><img src="{url}"></a>` in `st.markdown`.** One call covers both cases (`link` is `None` without `GITHUB_REPO`).
+   - The plan's HTML loads the thumbnail from GitHub, so it is not the saved file path that spec behaviours 14 and 18 ask for, and the thumbnail itself would break if GitHub were unreachable or the repository private.
+   - It also builds HTML from a file name with `unsafe_allow_html=True`.
+   - `st.image(link=…)` exists in Streamlit 1.55.0 and 1.67.0; in Chromium it renders `<a href="…" target="_blank" rel="noreferrer">` on both (spec behaviour 21).
+   - The plan's test `test_render_preview_links_thumbnail_when_github_repo_set` therefore asserts the image call `("scorecard_images/foo.jpg", 160, <raw URL>)` and no markdown, instead of the anchor text.
+2. **A file Streamlit can't display doesn't break the form.** `st.image` raises on an empty or non-image file (`PIL.UnidentifiedImageError`), which stops the page before the score form renders. The thumbnail call is wrapped; on failure the preview shows nothing and logs a `[scorecard]` warning.
+3. **Bilingual labels and a caption, like the rest of the form.** The button is `🔍 查看大图 View` and the dialog title `已存计分卡 Saved scorecard` (the plan: `View`, `Saved scorecard`). A caption under the thumbnail reads `已存计分卡 Saved scorecard · <date from the file name>`, plus `点击缩略图打开原图 Click the thumbnail to open the original` when it is linked. Without a caption the thumbnail sits unlabelled next to the scorecard upload box. The tests check that the labels contain `View` and `Saved scorecard`.
+4. **The dialog is `width="large"`.** The default small dialog is 500 px wide, too narrow to read a scorecard.
+5. **Tests beyond the Definition of done:** an undisplayable file, the page never opening the image itself, and the page's import list.
