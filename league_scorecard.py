@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 from collections.abc import Mapping as AbcMapping
 from collections.abc import MutableMapping as AbcMutableMapping  # noqa: F401
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from difflib import get_close_matches
 from typing import Any, Iterable, Mapping, MutableMapping, Sequence
@@ -63,6 +63,17 @@ ScorecardFieldValue = str | int
 SCORECARD_IMAGES_DIR: str = "scorecard_images"
 SCORECARD_THUMBNAIL_WIDTH: int = 160
 SCORECARD_IMAGE_SUFFIXES: tuple[str, ...] = (".jpg", ".jpeg", ".png", ".webp", ".gif")
+
+# Hole-by-hole read: the card's par and each player's score per hole, shown to the
+# admin as a check table beside the uploaded image.
+HOLE_NUMBERS: tuple[int, ...] = tuple(range(1, 19))
+OUT_HOLES: tuple[int, ...] = tuple(range(1, 10))
+IN_HOLES: tuple[int, ...] = tuple(range(10, 19))
+HOLE_SCORE_MIN, HOLE_SCORE_MAX = 1, 20
+PAR_MIN, PAR_MAX = 3, 7
+VERIFICATION_TABLE_COLUMNS: tuple[str, ...] = tuple(str(h) for h in HOLE_NUMBERS) + ("Out", "In", "Total")
+VERIFICATION_ROW_LABELS: tuple[str, str] = ("Par", "Score")
+LEAGUE_SCORECARD_READ_RESULT_KEY: str = "league_scorecard_read_result"
 
 LEAGUE_SCORECARD_FIELD_KEYS: tuple[str, ...] = (
     "date",
@@ -169,12 +180,14 @@ class ScorecardPlayerEntry:
     index: int
     label: str
     found_fields: dict[str, ScorecardFieldValue]
+    hole_scores: dict[int, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
 class LeagueScorecardPlayersResult:
     players: list[ScorecardPlayerEntry]
     unavailable_reason: str | None = None
+    pars: dict[int, int] = field(default_factory=dict)
 
 
 def normalize_field_name(name: object) -> str | None:
@@ -312,6 +325,46 @@ _PLAYER_LABEL_KEYS: tuple[str, ...] = (
 )
 
 
+def normalize_hole_number(key: object) -> int | None:
+    """1-18 for an int or a digit-only string naming a hole, else None."""
+    if isinstance(key, bool):
+        return None
+    if isinstance(key, int):
+        return key if 1 <= key <= 18 else None
+    if isinstance(key, str):
+        text = key.strip()
+        if text.isdigit():
+            number = int(text)
+            return number if 1 <= number <= 18 else None
+    return None
+
+
+def coerce_hole_values(raw: object, *, minimum: int, maximum: int) -> dict[int, int]:
+    """Hole number -> int for each readable, in-range entry of a hole mapping; {} for non-mappings."""
+    if not isinstance(raw, AbcMapping):
+        return {}
+    values: dict[int, int] = {}
+    for raw_key, raw_value in raw.items():
+        hole = normalize_hole_number(raw_key)
+        if hole is None:
+            continue
+        value = coerce_int_value(raw_value, minimum=minimum, maximum=maximum)
+        if value is None:
+            continue
+        values[hole] = value
+    return {hole: values[hole] for hole in HOLE_NUMBERS if hole in values}
+
+
+def coerce_par_values(raw: object) -> dict[int, int]:
+    """coerce_hole_values with PAR_MIN..PAR_MAX."""
+    return coerce_hole_values(raw, minimum=PAR_MIN, maximum=PAR_MAX)
+
+
+def coerce_hole_scores(raw: object) -> dict[int, int]:
+    """coerce_hole_values with HOLE_SCORE_MIN..HOLE_SCORE_MAX."""
+    return coerce_hole_values(raw, minimum=HOLE_SCORE_MIN, maximum=HOLE_SCORE_MAX)
+
+
 def _player_label(record: Mapping[str, object]) -> str | None:
     """The printed label for one parsed player record, or None when it has none."""
     for key in _PLAYER_LABEL_KEYS:
@@ -353,7 +406,12 @@ def scorecard_player_entries(parsed: Mapping[str, object]) -> list[ScorecardPlay
         if label is None:
             continue
         entries.append(
-            ScorecardPlayerEntry(index=len(entries), label=label, found_fields=_player_fields(raw))
+            ScorecardPlayerEntry(
+                index=len(entries),
+                label=label,
+                found_fields=_player_fields(raw),
+                hole_scores=coerce_hole_scores(raw.get("hole_scores")),
+            )
         )
     return entries
 
@@ -387,22 +445,28 @@ SCORECARD_PLAYERS_PROMPT: str = (
     "You read one photographed golf league scorecard that may show several players' scores. "
     "The card may be printed or handwritten, in Chinese, English, or both.\n"
     "Return a single JSON object and nothing else, shaped as:\n"
-    '{"players": [{"label": "<text printed for this player>", "fields": {...}}, ...]}\n'
+    '{"pars": {"1": <int>, ..., "18": <int>}, '
+    '"players": [{"label": "<text printed for this player>", "fields": {...}, '
+    '"hole_scores": {"1": <int>, ..., "18": <int>}}, ...]}\n'
     "Rules:\n"
     '- Return one object in "players" for every player printed on the card, in the order the '
     "players appear on the card. Never drop a player and never list a player twice.\n"
+    '- "pars": one numeric par for each hole 1-18 printed on the card, keyed by the hole number '
+    'as a string. Omit any hole whose par you cannot read with confidence.\n'
     '- "label": the player\'s printed name. When no name is printed, use the column header printed '
     "above that player's scores, exactly as printed. Never invent a label and never use "
     "A/B/C/Marker.\n"
     '- "fields": an object holding only the scores that belong to this one player, using any of '
     '"date", "venue", "net", "gross", "stableford", "eagles", "birdies", "pars", "bogeys", '
     '"double_bogeys_or_worse".\n'
+    '- "hole_scores": one numeric score for each hole 1-18 for this player only, keyed by the hole '
+    'number as a string. Omit any hole whose score you cannot read with confidence.\n'
     '- "date": the round date as an ISO string "YYYY-MM-DD".\n'
     '- "venue": the venue/course name exactly as printed on the card.\n'
     '- "net", "gross", "stableford": integers.\n'
     '- "eagles", "birdies", "pars", "bogeys", "double_bogeys_or_worse": non-negative integer counts.\n'
     "- Omit any field you cannot read with confidence. Never guess and never invent a value.\n"
-    "- Do not add keys other than \"players\", \"label\" and \"fields\"."
+    '- Do not add keys other than "pars", "players", "label", "fields" and "hole_scores".'
 )
 
 
@@ -676,10 +740,15 @@ def read_league_scorecard_players(
         if result.unavailable_reason is not None:
             log.warning("players read: unavailable (%s)", result.unavailable_reason)
         else:
+            log.info("pars read: %s", len(result.pars))
             log.info(
                 "players read: %s player(s): %s",
                 len(result.players),
                 "; ".join(f"{p.label!r} -> {p.found_fields}" for p in result.players),
+            )
+            log.info(
+                "hole scores read: %s",
+                "; ".join(f"{p.label!r} -> {p.hole_scores}" for p in result.players),
             )
     except Exception:  # pragma: no cover - logging must never break a read
         pass
@@ -717,7 +786,7 @@ def _read_league_scorecard_players(
     if not players:
         log.warning("players read: no labelled players in the reply: %s", _describe_parsed_shape(parsed))
         return LeagueScorecardPlayersResult([], "no readable players")
-    return LeagueScorecardPlayersResult(players)
+    return LeagueScorecardPlayersResult(players, pars=coerce_par_values(parsed.get("pars")))
 
 
 # ---------------------------------------------------------------- session state
@@ -773,6 +842,47 @@ def apply_selected_player_scorecard_updates(
             del session_state[key]
     updates = selected_player_scorecard_updates(result, selected_index)
     return apply_scorecard_updates(updates, widget_keys, session_state)
+
+
+def selected_player_hole_scores(
+    result: LeagueScorecardPlayersResult,
+    selected_index: int | None,
+) -> dict[int, int]:
+    """Hole scores for exactly the selected entry, or {} when no valid entry is selected."""
+    if result is None or isinstance(selected_index, bool) or not isinstance(selected_index, int):
+        return {}
+    for entry in getattr(result, "players", ()) or ():
+        if getattr(entry, "index", None) == selected_index:
+            scores = getattr(entry, "hole_scores", {})
+            return dict(scores) if isinstance(scores, AbcMapping) else {}
+    return {}
+
+
+def scorecard_hole_totals(values: Mapping[int, int]) -> dict[str, int | None]:
+    """Out/In/Total sums, each None unless every hole it covers was read."""
+    data = values if isinstance(values, AbcMapping) else {}
+    out_total = sum(data[h] for h in OUT_HOLES) if all(h in data for h in OUT_HOLES) else None
+    in_total = sum(data[h] for h in IN_HOLES) if all(h in data for h in IN_HOLES) else None
+    total = out_total + in_total if out_total is not None and in_total is not None else None
+    return {"Out": out_total, "In": in_total, "Total": total}
+
+
+def scorecard_verification_row(values: Mapping[int, int]) -> list[int | None]:
+    """21 cells in VERIFICATION_TABLE_COLUMNS order for one hole-values mapping."""
+    data = values if isinstance(values, AbcMapping) else {}
+    totals = scorecard_hole_totals(data)
+    return [data.get(h) for h in HOLE_NUMBERS] + [totals["Out"], totals["In"], totals["Total"]]
+
+
+def scorecard_verification_table(
+    pars: Mapping[int, int],
+    hole_scores: Mapping[int, int],
+) -> dict[str, list[int | None]]:
+    """{"Par": [...], "Score": [...]}, 21 cells each in VERIFICATION_TABLE_COLUMNS order."""
+    return {
+        VERIFICATION_ROW_LABELS[0]: scorecard_verification_row(pars),
+        VERIFICATION_ROW_LABELS[1]: scorecard_verification_row(hole_scores),
+    }
 
 
 def scorecard_upload_fingerprint(file_name: str, payload: bytes) -> str:
