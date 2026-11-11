@@ -28,6 +28,7 @@ from league_scorecard import (  # noqa: E402
     LOGGER_NAME,
     LEAGUE_SCORECARD_FIELD_KEYS,
     LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY,
+    LEAGUE_SCORECARD_READ_RESULT_KEY,
     LeagueScorecardPlayersResult,
     SCORECARD_THUMBNAIL_WIDTH,
     SavedScorecard,
@@ -39,7 +40,11 @@ from league_scorecard import (  # noqa: E402
     scorecard_github_repo,
     scorecard_image_url,
     scorecard_upload_fingerprint,
+    scorecard_verification_table,
+    selected_player_hole_scores,
     venue_names_from_records,
+    VERIFICATION_ROW_LABELS,
+    VERIFICATION_TABLE_COLUMNS,
 )
 
 # ── Scorecard auto-fill (admin score form) ───────────────────────────────────
@@ -122,7 +127,7 @@ def _scorecard_players_for_form(result: LeagueScorecardPlayersResult) -> LeagueS
         )
         for player in result.players
     ]
-    return LeagueScorecardPlayersResult(players, result.unavailable_reason)
+    return LeagueScorecardPlayersResult(players, result.unavailable_reason, result.pars)
 
 
 def _scorecard_duplicate_suffix(players: list[ScorecardPlayerEntry], index: int) -> str:
@@ -140,6 +145,9 @@ def _scorecard_duplicate_suffix(players: list[ScorecardPlayerEntry], index: int)
 SAVED_SCORECARD_LABEL = "已存计分卡 Saved scorecard"
 SAVED_SCORECARD_LINK_HINT = "点击缩略图打开原图 Click the thumbnail to open the original"
 SAVED_SCORECARD_VIEW_LABEL = "🔍 查看大图 View"
+SCORECARD_CHECK_LABEL = "逐洞核对 Hole-by-hole check"
+SCORECARD_CHECK_COLUMN_WIDTH = 42  # pixels per hole column in the check tables
+SCORECARD_CHECK_INCOMPLETE = "“-” 为未能读出的洞，合计仅在全部读出时显示。 “-” marks a hole that could not be read; totals show only when every hole was read."
 
 
 @st.dialog(SAVED_SCORECARD_LABEL, width="large")
@@ -505,6 +513,9 @@ if is_admin_user():
                     players_result: LeagueScorecardPlayersResult = read_league_scorecard_players(image_bytes, mime_type)
                 players_result = _scorecard_players_for_form(players_result)
                 st.session_state[LEAGUE_SCORECARD_PLAYERS_KEY] = players_result
+                # The same read, kept for the hole-by-hole check table above Save.
+                scorecard_read_result = players_result
+                st.session_state[LEAGUE_SCORECARD_READ_RESULT_KEY] = scorecard_read_result
                 # A new card starts with nobody picked and the round's own values in the form.
                 st.session_state[LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY] = None
                 st.session_state.pop(LEAGUE_SCORECARD_APPLIED_PICK_KEY, None)
@@ -526,6 +537,7 @@ if is_admin_user():
             # Selecting the same card again after clearing it is a new, manual read.
             st.session_state.pop(LEAGUE_SCORECARD_LAST_READ_KEY, None)
             st.session_state.pop(LEAGUE_SCORECARD_PLAYERS_KEY, None)
+            st.session_state.pop(LEAGUE_SCORECARD_READ_RESULT_KEY, None)
 
         if st.session_state.get(LEAGUE_SCORECARD_NOTICE_KEY):
             st.info(st.session_state[LEAGUE_SCORECARD_NOTICE_KEY])
@@ -601,6 +613,60 @@ if is_admin_user():
             in_par = bc3.number_input("标准 Par", min_value=0, **_scorecard_widget_default("pars", _base_pars))
             in_bg = bc4.number_input("柏忌 Bogey", min_value=0, **_scorecard_widget_default("bogeys", _base_bogeys))
             in_dbg = bc5.number_input("双柏忌+ D.Bogey+", min_value=0, **_scorecard_widget_default("double_bogeys_or_worse", _base_double_bogeys_or_worse))
+
+            # Check before saving: the uploaded card beside what was read off it, hole by hole.
+            # Display only: built from the stored read, never from the form's fields.
+            scorecard_read_result = st.session_state.get(LEAGUE_SCORECARD_READ_RESULT_KEY)
+            selected_player_index = st.session_state.get(LEAGUE_SCORECARD_PLAYER_SELECTOR_KEY)
+            valid_player_selected = (
+                isinstance(selected_player_index, int)
+                and not isinstance(selected_player_index, bool)
+                and scorecard_read_result is not None
+                and any(
+                    getattr(player, "index", None) == selected_player_index
+                    for player in getattr(scorecard_read_result, "players", ())
+                )
+            )
+            if uploaded_scorecard is not None:
+                scorecard_image_column, scorecard_table_column = st.columns([1, 2])
+                with scorecard_image_column:
+                    try:
+                        st.image(uploaded_scorecard)
+                    except Exception as exc:  # a file Streamlit can't display must not break the form
+                        scorecard_log.warning("League form: cannot show uploaded scorecard: %r", exc)
+                with scorecard_table_column:
+                    if valid_player_selected:
+                        verification = scorecard_verification_table(
+                            scorecard_read_result.pars,
+                            selected_player_hole_scores(scorecard_read_result, selected_player_index),
+                        )
+                        # Text cells, so an unread hole shows "-" and scores stay whole numbers.
+                        verification_frame = pd.DataFrame(
+                            [["-" if cell is None else str(cell) for cell in verification[label]]
+                             for label in VERIFICATION_ROW_LABELS],
+                            index=list(VERIFICATION_ROW_LABELS),
+                            columns=list(VERIFICATION_TABLE_COLUMNS),
+                        )
+                        _picked = scorecard_read_result.players[selected_player_index]
+                        st.caption(f"{SCORECARD_CHECK_LABEL} · {_picked.label}")
+                        # Front nine with Out, then back nine with In and Total, like a scorecard.
+                        # Narrow fixed columns, so all of them fit beside the image without scrolling.
+                        _narrow = {name: st.column_config.Column(width=SCORECARD_CHECK_COLUMN_WIDTH)
+                                   for name in VERIFICATION_TABLE_COLUMNS}
+                        st.dataframe(verification_frame[list(VERIFICATION_TABLE_COLUMNS[:9]) + ["Out"]],
+                                     column_config=_narrow)
+                        st.dataframe(verification_frame[list(VERIFICATION_TABLE_COLUMNS[9:18]) + ["In", "Total"]],
+                                     column_config=_narrow)
+                        _hole_total = verification[VERIFICATION_ROW_LABELS[1]][-1]
+                        _gross_read = _picked.found_fields.get("gross")
+                        if _hole_total is None:
+                            st.caption(SCORECARD_CHECK_INCOMPLETE)
+                        elif _gross_read is not None and _hole_total != _gross_read:
+                            st.warning(
+                                f"⚠️ 逐洞合计 {_hole_total} 与读到的总杆 {_gross_read} 不一致，请对照图片核对。 "
+                                f"The hole scores add up to {_hole_total}, but the gross read off the card is "
+                                f"{_gross_read}. Check against the image."
+                            )
 
             if st.form_submit_button("✅ 保存成绩 Save", width='stretch'):
                 total_holes = in_eg + in_bd + in_par + in_bg + in_dbg
