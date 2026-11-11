@@ -841,12 +841,22 @@ def selected_player_scorecard_updates(
     result: LeagueScorecardPlayersResult,
     selected_index: int | None,
 ) -> dict[str, ScorecardFieldValue]:
-    """Fields for exactly the selected entry, or {} when no valid entry is selected."""
+    """Fields for the selected entry, with complete hole-derived counts replacing model counts.
+
+    When the card's par and the entry's score are read for all 18 holes, the five
+    count fields are counted from score minus par, so they match the check table.
+    Otherwise the entry's found fields are returned as read. {} when no valid
+    entry is selected.
+    """
     if selected_index is None or isinstance(selected_index, bool) or not isinstance(selected_index, int):
         return {}
     for entry in result.players:
         if entry.index == selected_index:
-            return dict(entry.found_fields)
+            updates: dict[str, ScorecardFieldValue] = dict(entry.found_fields)
+            counts = scorecard_score_type_counts(result.pars, entry.hole_scores)
+            if counts is not None:
+                updates.update(counts)
+            return updates
     return {}
 
 
