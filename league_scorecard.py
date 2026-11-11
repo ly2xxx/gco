@@ -844,6 +844,47 @@ def apply_selected_player_scorecard_updates(
     return apply_scorecard_updates(updates, widget_keys, session_state)
 
 
+def selected_player_hole_scores(
+    result: LeagueScorecardPlayersResult,
+    selected_index: int | None,
+) -> dict[int, int]:
+    """Hole scores for exactly the selected entry, or {} when no valid entry is selected."""
+    if result is None or isinstance(selected_index, bool) or not isinstance(selected_index, int):
+        return {}
+    for entry in getattr(result, "players", ()) or ():
+        if getattr(entry, "index", None) == selected_index:
+            scores = getattr(entry, "hole_scores", {})
+            return dict(scores) if isinstance(scores, AbcMapping) else {}
+    return {}
+
+
+def scorecard_hole_totals(values: Mapping[int, int]) -> dict[str, int | None]:
+    """Out/In/Total sums, each None unless every hole it covers was read."""
+    data = values if isinstance(values, AbcMapping) else {}
+    out_total = sum(data[h] for h in OUT_HOLES) if all(h in data for h in OUT_HOLES) else None
+    in_total = sum(data[h] for h in IN_HOLES) if all(h in data for h in IN_HOLES) else None
+    total = out_total + in_total if out_total is not None and in_total is not None else None
+    return {"Out": out_total, "In": in_total, "Total": total}
+
+
+def scorecard_verification_row(values: Mapping[int, int]) -> list[int | None]:
+    """21 cells in VERIFICATION_TABLE_COLUMNS order for one hole-values mapping."""
+    data = values if isinstance(values, AbcMapping) else {}
+    totals = scorecard_hole_totals(data)
+    return [data.get(h) for h in HOLE_NUMBERS] + [totals["Out"], totals["In"], totals["Total"]]
+
+
+def scorecard_verification_table(
+    pars: Mapping[int, int],
+    hole_scores: Mapping[int, int],
+) -> dict[str, list[int | None]]:
+    """{"Par": [...], "Score": [...]}, 21 cells each in VERIFICATION_TABLE_COLUMNS order."""
+    return {
+        VERIFICATION_ROW_LABELS[0]: scorecard_verification_row(pars),
+        VERIFICATION_ROW_LABELS[1]: scorecard_verification_row(hole_scores),
+    }
+
+
 def scorecard_upload_fingerprint(file_name: str, payload: bytes) -> str:
     """Stable id of one selected file, so the same upload is read only once."""
     return hashlib.sha256(str(file_name).encode("utf-8") + b"\x00" + bytes(payload or b"")).hexdigest()
