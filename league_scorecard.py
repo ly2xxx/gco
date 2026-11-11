@@ -365,6 +365,31 @@ def coerce_hole_scores(raw: object) -> dict[int, int]:
     return coerce_hole_values(raw, minimum=HOLE_SCORE_MIN, maximum=HOLE_SCORE_MAX)
 
 
+def scorecard_score_type_counts(
+    pars: Mapping[int, int],
+    hole_scores: Mapping[int, int],
+) -> dict[str, int] | None:
+    """Five score-type counts from score-minus-par for all 18 holes, or None when either mapping lacks any hole 1-18."""
+    if not isinstance(pars, AbcMapping) or not isinstance(hole_scores, AbcMapping):
+        return None
+    if any(hole not in pars or hole not in hole_scores for hole in HOLE_NUMBERS):
+        return None
+    counts = {key: 0 for key in COUNT_FIELD_KEYS}
+    for hole in HOLE_NUMBERS:
+        diff = hole_scores[hole] - pars[hole]
+        if diff <= -2:
+            counts["eagles"] += 1
+        elif diff == -1:
+            counts["birdies"] += 1
+        elif diff == 0:
+            counts["pars"] += 1
+        elif diff == 1:
+            counts["bogeys"] += 1
+        else:
+            counts["double_bogeys_or_worse"] += 1
+    return counts
+
+
 def _player_label(record: Mapping[str, object]) -> str | None:
     """The printed label for one parsed player record, or None when it has none."""
     for key in _PLAYER_LABEL_KEYS:
@@ -816,12 +841,22 @@ def selected_player_scorecard_updates(
     result: LeagueScorecardPlayersResult,
     selected_index: int | None,
 ) -> dict[str, ScorecardFieldValue]:
-    """Fields for exactly the selected entry, or {} when no valid entry is selected."""
+    """Fields for the selected entry, with complete hole-derived counts replacing model counts.
+
+    When the card's par and the entry's score are read for all 18 holes, the five
+    count fields are counted from score minus par, so they match the check table.
+    Otherwise the entry's found fields are returned as read. {} when no valid
+    entry is selected.
+    """
     if selected_index is None or isinstance(selected_index, bool) or not isinstance(selected_index, int):
         return {}
     for entry in result.players:
         if entry.index == selected_index:
-            return dict(entry.found_fields)
+            updates: dict[str, ScorecardFieldValue] = dict(entry.found_fields)
+            counts = scorecard_score_type_counts(result.pars, entry.hole_scores)
+            if counts is not None:
+                updates.update(counts)
+            return updates
     return {}
 
 
