@@ -1,0 +1,49 @@
+name: Dependabot monitor
+
+# Keeps one issue, labelled "dependabot", listing this repository's open Dependabot
+# alerts by package with the version that clears them all. The sdlc-dependabot-remediate
+# skill (ly2xxx/sdlc-github) reads it and fixes the alerts through the SDLC Pipeline.
+# The monitor is the reusable workflow in ly2xxx/.github:
+# https://github.com/ly2xxx/.github/blob/main/actions/dependabot-alerts/README.md
+#
+# Each run reports this repository's name, and nothing else, to the pipeline's usage
+# endpoint. It is a condition of use:
+# https://github.com/ly2xxx/.github/blob/main/LICENSING.md#usage-tracking
+#
+# One-time setup: a fine-grained token limited to this repository, with "Dependabot
+# alerts: Read-only", saved as the Actions secret DEPENDABOT_ALERTS_TOKEN. Without it the
+# monitor scans the manifests with Trivy instead.
+#
+# Runs weekly, on Run workflow, after a push that changes a manifest (waiting 10 minutes
+# so Dependabot has rescanned), and on a "/refresh" comment on the tracking issue by
+# someone with write access.
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "**/requirements*.txt"
+      - "**/pyproject.toml"
+      - "**/*.lock"
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  monitor:
+    if: >-
+      github.event_name != 'issue_comment' || (
+        contains(github.event.issue.labels.*.name, 'dependabot') &&
+        startsWith(github.event.comment.body, '/refresh') &&
+        contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    uses: ly2xxx/.github/.github/workflows/dependabot-monitor.yml@main
+    with:
+      wait-minutes: ${{ github.event_name == 'push' && 10 || 0 }}
+    secrets:
+      DEPENDABOT_ALERTS_TOKEN: ${{ secrets.DEPENDABOT_ALERTS_TOKEN }}
