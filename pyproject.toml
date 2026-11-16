@@ -3,7 +3,7 @@ name = "gco"
 version = "0.1.0"
 description = "GCO Golf Club Events & League Management Dashboard"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.5"
 dependencies = [
     "streamlit>=1.40.0",
     "pandas>=2.0.0",
@@ -12,7 +12,7 @@ dependencies = [
     "requests>=2.31.0",
     "openpyxl>=3.1.0",
     "pymupdf4llm>=1.27.2.2",
-    "markitdown[all]>=0.1.5",
+    "markitdown[docx,pdf,pptx,xlsx,xls]>=0.1.5",
 ]
 
 [project.optional-dependencies]
