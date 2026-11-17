@@ -60,7 +60,10 @@ Read from the code and the tracking issue on 2026-11-16. Use these exactly.
 
 ## Done
 
-Nothing yet.
+- Piece 1 (feature `016-dependabot-remediation-lock-upgrade`, ly2xxx/gco#80, merged
+  2026-11-16): all 151 alerts closed. The monitor read "No open alerts" from the
+  Dependabot alerts API at 2026-11-16 23:56 UTC and closed issue #76.
+  `.trivyignore`: no entries added. Remediation complete.
 
 ## Piece 1: Lock upgrade
 
